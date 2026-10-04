@@ -6,28 +6,10 @@ const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('disco
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// مسار تسجيل الدخول
-app.get('/auth/login', (req, res) => {
-    const clientId = process.env.CLIENT_ID;
-    const redirectUri = encodeURIComponent(`https://${req.get('host')}/auth/discord/callback`);
-    const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify%20guilds`;
-    res.redirect(discordAuthUrl);
-});
-
-// مسار الـ Callback (يستقبل الكود من ديسكورد ويدخلك للوحة)
-app.get('/auth/discord/callback', (req, res) => {
-    const { code } = req.query;
-    if (!code) {
-        return res.redirect('/');
-    }
-    // مؤقتاً بعد نجاح التفويض يتم توجيهك للوحة التحكم مباشرة
-    res.redirect('/dashboard');
-});
-
-// الملفات الثابتة
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
+// فتح لوحة التحكم أو الصفحة الرئيسية مباشرة بدون قيود لتجنب أي مشاكل
 app.get('/dashboard', (req, res) => {
     const dashboardPath = path.join(publicPath, 'dashboard.html');
     if (fs.existsSync(dashboardPath)) {
