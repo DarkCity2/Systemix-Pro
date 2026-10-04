@@ -1,20 +1,22 @@
-const express = require('express');
+const fs = require('fs');
 const path = require('path');
-const cfg = require('./config');
+const express = require('express');
+const basicAuth = require('express-basic-auth');
+const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('discord.js');
 
-if (!cfg.token || !cfg.clientId || !cfg.clientSecret) {
-    console.error('❌ لازم تعبي TOKEN و CLIENT_ID و CLIENT_SECRET في ملف .env');
-    process.exit(1);
-}
-
-// 1. تشغيل البوت
-const client = require('./bot');
-
-// 2. إعداد السيرفر وتشغيله مرة واحدة فقط بشرط عدم التكرار
+// 1. إعداد السيرفر واللوحة
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const PORT = process.env.PORT || 10000;
 
+app.use(basicAuth({
+    users: { 
+        'admin': process.env.DASHBOARD_PASSWORD || '123456' 
+    },
+    challenge: true,
+    unauthorizedResponse: 'عذراً، كلمة السر غير صحيحة!'
+}));
+
+// ربط مجلد الـ public الخاص باللوحة
 const publicPath = path.join(__dirname, 'web', 'public');
 app.use(express.static(publicPath));
 
@@ -22,24 +24,38 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(publicPath, 'index.html'));
 });
 
-app.get('/api/stats', (req, res) => {
-    res.json({
-        guilds: client.guilds ? client.guilds.cache.size : 0,
-        users: client.users ? client.users.cache.size : 0,
-        ping: client.ws ? client.ws.ping : 0,
-        uptime: client.uptime || 0
-    });
+app.listen(PORT, () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
 });
 
-const PORT = process.env.PORT || 10000;
+// 2. إعداد وتشغيل بوت الديسكورد
+const client = new Client({
+  intents: [
+    I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent,
+    I.GuildMessageReactions, I.GuildVoiceStates, I.GuildModeration, I.GuildInvites,
+    I.GuildExpressions ?? I.GuildEmojisAndStickers
+  ],
+  partials: [P.Message, P.Channel, P.Reaction, P.User, P.GuildMember]
+});
 
-// التحقق من تشغيل السيرفر مرة واحدة فقط لعدم حدوث EADDRINUSE
-if (!global.serverStarted) {
-    global.serverStarted = true;
-    app.listen(PORT, () => {
-        console.log(`🚀 Server is running on port ${PORT}`);
-    });
+client.commands = new Collection();
+
+const loadFiles = dir => {
+    const fullDir = path.join(__dirname, 'bot', dir);
+    if (fs.existsSync(fullDir)) {
+        return fs.readdirSync(fullDir).filter(f => f.endsWith('.js')).map(f => require(path.join(fullDir, f)));
+    }
+    return [];
+};
+
+for (const c of loadFiles('commands')) client.commands.set(c.data.name, c);
+for (const m of loadFiles('events')) {
+  for (const ev of [].concat(m)) {
+    client[ev.once ? 'once' : 'on'](ev.name, (...args) =>
+      Promise.resolve(ev.execute(...args, client)).catch(e => console.error(`[${ev.name}]`, e)));
+  }
 }
 
-// 3. تسديل دخول البوت
-client.login(cfg.token);
+client.login(process.env.TOKEN);
+
+module.exports = client;
