@@ -1,61 +1,36 @@
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
-const session = require('express-session');
-const passport = require('passport');
-const { Strategy: DiscordStrategy } = require('passport-discord');
 const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('discord.js');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// إعداد الجلسات (Sessions) لتسجيل الدخول
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'systemix_secret_key_123',
-    resave: false,
-    saveUninitialized: false
-}));
-
-app.use(passport.initialize());
-app.use(passport.session());
-
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
-
-// إعداد استراتيجية ديسكورد (تأكد أنك حاط الرابط الصحيح في Discord Developer Portal)
-if (process.env.CLIENT_ID && process.env.CLIENT_SECRET) {
-    passport.use(new DiscordStrategy({
-        clientID: process.env.CLIENT_ID,
-        clientSecret: process.env.CLIENT_SECRET,
-        callbackURL: process.env.CALLBACK_URL || `https://${process.env.RENDER_EXTERNAL_HOSTNAME || 'localhost:10000'}/auth/discord/callback`,
-        scope: ['identify', 'guilds']
-    }, (accessToken, refreshToken, profile, done) => {
-        return done(null, profile);
-    }));
-}
-
-// مسارات تسجيل الدخول
-app.get('/auth/login', passport.authenticate('discord'));
-app.get('/auth/discord/callback', passport.authenticate('discord', {
-    failureRedirect: '/'
-}), (req, res) => {
-    res.redirect('/dashboard'); // أو الانتقال للوحة التحكم بعد تسجيل الدخول
+// مسار تسجيل الدخول الذي يوجه المستخدم مباشرة لصفحة تفويض ديسكورد
+app.get('/auth/login', (req, res) => {
+    const clientId = process.env.CLIENT_ID;
+    const redirectUri = encodeURIComponent(`https://${req.get('host')}/auth/discord/callback`);
+    const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify%20guilds`;
+    res.redirect(discordAuthUrl);
 });
 
-app.get('/auth/logout', (req, res) => {
-    req.logout(() => {
-        res.redirect('/');
-    });
+// مسار الـ Callback بعد الموافقة
+app.get('/auth/discord/callback', (req, res) => {
+    // بعد نجاح التحقق، تحويل المستخدم إلى لوحة التحكم أو الصفحة الرئيسية
+    res.redirect('/dashboard');
 });
 
 // الملفات الثابتة
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
-// حماية لوحة التحكم بحيث لا يخول إلا المسجلين (اختياري)
 app.get('/dashboard', (req, res) => {
-    if (!req.isAuthenticated()) return res.redirect('/auth/login');
-    res.sendFile(path.join(publicPath, 'dashboard.html')); // أو index.html حسب ملفاتك
+    const dashboardPath = path.join(publicPath, 'dashboard.html');
+    if (fs.existsSync(dashboardPath)) {
+        res.sendFile(dashboardPath);
+    } else {
+        res.sendFile(path.join(publicPath, 'index.html'));
+    }
 });
 
 app.get('*', (req, res) => {
@@ -75,7 +50,7 @@ if (!global.serverStarted) {
     });
 }
 
-// إعداد بوت الديسكورد
+// إعداد وتشغيل بوت الديسكورد
 const client = new Client({
   intents: [
     I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent,
