@@ -302,6 +302,9 @@ function start(client) {
   // ---------- خريطة النشاط ----------
   app.get(`${G}/heatmap`, gauth, (req, res) => res.json({ heat: db.guild(req.guild.id).heat }));
 
+ app.get('/auth/login', (req, res) => {
+    res.redirect('/');
+});
   // ---------- الملفات الثابتة ----------
   app.use(express.static(PUBLIC, { maxAge: '1h', index: 'index.html' }));
   app.use('/api', (req, res) => res.status(404).json({ error: 'غير موجود' }));
