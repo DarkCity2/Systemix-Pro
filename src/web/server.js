@@ -7,7 +7,6 @@ function start(client) {
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
 
-    // مسار الملفات الثابتة للوحة
     const publicPath = path.join(__dirname, 'public');
     app.use(express.static(publicPath));
 
@@ -15,7 +14,6 @@ function start(client) {
         res.sendFile(path.join(publicPath, 'index.html'));
     });
 
-    // API البيانات الأساسية للبوت واللوحة
     app.get('/api/stats', (req, res) => {
         if (!client) {
             return res.json({ error: 'البوت غير متصل' });
