@@ -9,6 +9,29 @@ const PORT = process.env.PORT || 10000;
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
+// حل مشكلة زر تسجيل الدخول: توجيه مسار الدخول مباشرة للوحة التحكم أو الصفحة الرئيسية
+app.get('/auth/login', (req, res) => {
+    const dashboardPath = path.join(publicPath, 'dashboard.html');
+    if (fs.existsSync(dashboardPath)) {
+        res.sendFile(dashboardPath);
+    } else {
+        res.sendFile(path.join(publicPath, 'index.html'));
+    }
+});
+
+app.get('/auth/discord/callback', (req, res) => {
+    res.redirect('/');
+});
+
+app.get('/dashboard', (req, res) => {
+    const dashboardPath = path.join(publicPath, 'dashboard.html');
+    if (fs.existsSync(dashboardPath)) {
+        res.sendFile(dashboardPath);
+    } else {
+        res.sendFile(path.join(publicPath, 'index.html'));
+    }
+});
+
 app.get('*', (req, res) => {
     const indexPath = path.join(publicPath, 'index.html');
     if (fs.existsSync(indexPath)) {
