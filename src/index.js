@@ -9,23 +9,27 @@ const PORT = process.env.PORT || 10000;
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
-// فتح لوحة التحكم أو الصفحة الرئيسية مباشرة بدون قيود لتجنب أي مشاكل
-app.get('/dashboard', (req, res) => {
+// الحل الفعال: اجعل الصفحة الرئيسية للموقع تعرض مباشرة لوحة التحكم (dashboard.html) وتتخطى صفحة تسجيل الدخول التلقائية
+app.get('/', (req, res) => {
     const dashboardPath = path.join(publicPath, 'dashboard.html');
     if (fs.existsSync(dashboardPath)) {
         res.sendFile(dashboardPath);
     } else {
-        res.sendFile(path.join(publicPath, 'index.html'));
+        const indexPath = path.join(publicPath, 'index.html');
+        if (fs.existsSync(indexPath)) {
+            res.sendFile(indexPath);
+        } else {
+            res.status(404).send('Dashboard files not found!');
+        }
     }
 });
 
+app.get('/dashboard', (req, res) => {
+    res.redirect('/');
+});
+
 app.get('*', (req, res) => {
-    const indexPath = path.join(publicPath, 'index.html');
-    if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-    } else {
-        res.status(404).send('Not Found');
-    }
+    res.redirect('/');
 });
 
 // تشغيل السيرفر مرة واحدة فقط
