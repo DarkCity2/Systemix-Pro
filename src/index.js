@@ -3,25 +3,39 @@ const basicAuth = require('express-basic-auth');
 const path = require('path');
 
 const app = express();
+const PORT = process.env.PORT || 10000;
 
-// إعدادات المصادقة للوحة التحكم
+// إعداد المصادقة الأساسية (Basic Auth)
 const dashboardPassword = process.env.DASHBOARD_PASSWORD || 'admin';
+
 app.use(basicAuth({
     users: { 'admin': dashboardPassword },
     challenge: true,
-    realm: 'Dashboard Protection'
+    realm: 'Systemix-Pro Dashboard'
 }));
 
-// تقديم الملفات الثابتة من مجلد public
-app.use(express.static(path.join(__dirname, '../public')));
+// معالجة توجيه صفحة تسجيل الدخول للتخلص من خطأ Cannot GET /auth/login
+app.get('/auth/login', (req, res) => {
+    res.redirect('/');
+});
 
+// تقديم الملفات الثابتة الخاصة باللوحة
+const publicPath = path.join(__dirname, 'web', 'public');
+app.use(express.static(publicPath));
+
+// المسار الرئيسي للوحة
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../public/index.html'));
+    res.sendFile(path.join(publicPath, 'index.html'));
 });
 
-// تحديد المنفذ ديناميكياً لتجنب تعارض المنفذ على Render
-const PORT = process.env.PORT || 10000;
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on port ${PORT}`);
+// معالجة باقي طلبات الـ API غير الموجودة
+app.use('/api', (req, res) => {
+    res.status(404).json({ error: 'غير موجود' });
 });
+
+// تشغيل السيرفر
+app.listen(PORT, () => {
+    console.log(`🌐 اللوحة شغالة على المنفذ ${PORT}`);
+});
+
+module.exports = app;
