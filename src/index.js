@@ -4,7 +4,7 @@ const express = require('express');
 const basicAuth = require('express-basic-auth');
 const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('discord.js');
 
-// 1. إعداد السيرفر واللوحة (Express + الحماية)
+// 1. إعداد السيرفر واللوحة
 const app = express();
 const PORT = process.env.PORT || 10000;
 
@@ -16,15 +16,20 @@ app.use(basicAuth({
     unauthorizedResponse: 'عذراً، كلمة السر غير صحيحة!'
 }));
 
-// تحديد المسار الصحيح لمجلد public الرئيسي في المشروع
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(publicPath, 'index.html'));
+// التعامل مع أي مسار في الواجهة لكي لا يظهر خطأ Cannot GET
+app.get('*', (req, res) => {
+    const indexPath = path.join(publicPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).send('Dashboard files not found!');
+    }
 });
 
-// تشغيل السيرفر مرة واحدة فقط وبشكل آمن
+// تشغيل السيرفر مرة واحدة فقط
 if (!global.serverStarted) {
     global.serverStarted = true;
     app.listen(PORT, () => {
