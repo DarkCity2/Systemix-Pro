@@ -1,12 +1,8 @@
 const express = require('express');
 const path = require('path');
-const http = require('http');
-const { Server } = require('socket.io');
 
 function start(client) {
     const app = express();
-    const server = http.createServer(app);
-    const io = new Server(server);
 
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
@@ -32,13 +28,8 @@ function start(client) {
         });
     });
 
-    // Socket.io للتحكم اللحظي
-    io.on('connection', (socket) => {
-        console.log('🔗 تم اتصال عميل جديد باللوحة');
-    });
-
     const PORT = process.env.PORT || 10000;
-    server.listen(PORT, () => {
+    app.listen(PORT, () => {
         console.log(`🚀 Server is running on port ${PORT}`);
     });
 }
