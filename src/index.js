@@ -6,32 +6,18 @@ const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('disco
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// مجلد الملفات الثابتة
+// مسار الملفات الثابتة الصحيح
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
-// توجيه زر تسجيل الدخول مباشرة للوحة التحكم لكسر حلقة إعادة التوجيه
-app.get('/auth/login', (req, res) => {
-    res.redirect('/dashboard');
-});
-
-app.get('/auth/discord/callback', (req, res) => {
-    res.redirect('/dashboard');
-});
-
-// مسار لوحة التحكم الفعلي
-app.get('/dashboard', (req, res) => {
-    const dashboardPath = path.join(publicPath, 'dashboard.html');
-    if (fs.existsSync(dashboardPath)) {
-        res.sendFile(dashboardPath);
-    } else {
-        res.sendFile(path.join(publicPath, 'index.html'));
-    }
-});
-
-// دعم مسارات الـ SPA لضمان عمل التطبيق الأساسي
+// التعامل مع مسارات الـ SPA والواجهة الأصلية الخاصة بك
 app.get('*', (req, res) => {
-    res.sendFile(path.join(publicPath, 'index.html'));
+    const indexPath = path.join(publicPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).send('index.html not found in public folder');
+    }
 });
 
 // تشغيل السيرفر مرة واحدة فقط
