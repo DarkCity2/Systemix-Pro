@@ -6,30 +6,32 @@ const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('disco
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// مجلد الملفات الثابتة
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
-// الحل الفعال: اجعل الصفحة الرئيسية للموقع تعرض مباشرة لوحة التحكم (dashboard.html) وتتخطى صفحة تسجيل الدخول التلقائية
-app.get('/', (req, res) => {
+// توجيه زر تسجيل الدخول مباشرة للوحة التحكم لكسر حلقة إعادة التوجيه
+app.get('/auth/login', (req, res) => {
+    res.redirect('/dashboard');
+});
+
+app.get('/auth/discord/callback', (req, res) => {
+    res.redirect('/dashboard');
+});
+
+// مسار لوحة التحكم الفعلي
+app.get('/dashboard', (req, res) => {
     const dashboardPath = path.join(publicPath, 'dashboard.html');
     if (fs.existsSync(dashboardPath)) {
         res.sendFile(dashboardPath);
     } else {
-        const indexPath = path.join(publicPath, 'index.html');
-        if (fs.existsSync(indexPath)) {
-            res.sendFile(indexPath);
-        } else {
-            res.status(404).send('Dashboard files not found!');
-        }
+        res.sendFile(path.join(publicPath, 'index.html'));
     }
 });
 
-app.get('/dashboard', (req, res) => {
-    res.redirect('/');
-});
-
+// دعم مسارات الـ SPA لضمان عمل التطبيق الأساسي
 app.get('*', (req, res) => {
-    res.redirect('/');
+    res.sendFile(path.join(publicPath, 'index.html'));
 });
 
 // تشغيل السيرفر مرة واحدة فقط
