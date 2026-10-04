@@ -62,7 +62,6 @@ function start(client) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'same-origin');
-    // حماية CSRF: الطلبات المعدِّلة لازم تكون JSON ومن نفس الموقع
     if (req.method !== 'GET' && req.path.startsWith('/api/')) {
       const origin = req.get('origin');
       if (!req.is('json') || (origin && origin !== cfg.baseUrl)) return res.status(403).json({ error: 'طلب مرفوض' });
@@ -73,8 +72,25 @@ function start(client) {
   const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(e => res.status(400).json({ error: e.message || 'خطأ' }));
   const redirectUri = `${cfg.baseUrl}/auth/callback`;
 
-  // ---------- تسجيل الدخول ----------
-  app.get('/auth/login', (req, res) => {
+  // ---------- نظام الحماية بكلمة المرور (الباسورد) ----------
+  const SITE_PASSWORD = process.env.DASHBOARD_PASSWORD || process.env.SITE_PASSWORD || '12345';
+
+  app.post('/auth/login', (req, res) => {
+    const { password } = req.body || {};
+    if (password === SITE_PASSWORD) {
+      req.session.passwordAuthenticated = true;
+      return res.json({ success: true });
+    }
+    return res.status(401).json({ success: false, error: 'كلمة المرور غير صحيحة' });
+  });
+
+  const needPassword = (req, res, next) => {
+    if (req.session && req.session.passwordAuthenticated) return next();
+    return res.status(401).json({ error: 'Password Required' });
+  };
+
+  // ---------- تسجيل الدخول عبر ديسكورد ----------
+  app.get('/auth/discord/login', needPassword, (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
     req.session.state = state;
     res.redirect('https://discord.com/oauth2/authorize?' + new URLSearchParams({
@@ -82,7 +98,7 @@ function start(client) {
     }));
   });
 
-  app.get('/auth/callback', ah(async (req, res) => {
+  app.get('/auth/callback', needPassword, ah(async (req, res) => {
     const { code, state } = req.query;
     if (!code || !state || state !== req.session.state) return res.redirect('/?error=state');
     const tok = await fetch(`${DISCORD}/oauth2/token`, {
@@ -114,7 +130,7 @@ function start(client) {
     ...(guildId ? { guild_id: guildId, disable_guild_select: 'true' } : {})
   });
 
-  app.get('/invite', (req, res) => res.redirect(invite(req.query.guild)));
+  app.get('/invite', needPassword, (req, res) => res.redirect(invite(req.query.guild)));
 
   // ---------- واجهات عامة ----------
   app.get('/api/public/leaderboard/:id', ah(async (req, res) => {
@@ -127,16 +143,25 @@ function start(client) {
   app.get('/leaderboard/:id', (req, res) => res.sendFile(path.join(PUBLIC, 'leaderboard.html')));
 
   // ---------- يتطلب تسجيل دخول ----------
-  const needLogin = (req, res, next) => req.session.user ? next() : res.status(401).json({ error: 'سجل دخولك أول' });
+  const needLogin = (req, res, next) => {
+    if (!req.session || !req.session.passwordAuthenticated) return res.status(401).json({ error: 'Password Required' });
+    if (!req.session.user) return res.status(401).json({ error: 'سجل دخولك أول' });
+    next();
+  };
 
-  app.get('/api/me', needLogin, (req, res) => {
+  app.get('/api/me', needPassword, (req, res) => {
+    if (!req.session.user) {
+      return res.json({ passwordAuthenticated: true, user: null });
+    }
     res.json({
+      passwordAuthenticated: true,
       user: req.session.user,
       guilds: req.session.guilds.filter(canManage).map(g => ({ id: g.id, name: g.name, icon: g.icon, botIn: client.guilds.cache.has(g.id), inviteUrl: invite(g.id) }))
     });
   });
 
   const gauth = (req, res, next) => {
+    if (!req.session || !req.session.passwordAuthenticated) return res.status(401).json({ error: 'Password Required' });
     const sg = req.session.guilds?.find(g => g.id === req.params.id);
     if (!req.session.user || !sg || !canManage(sg)) return res.status(403).json({ error: 'ما عندك صلاحية على هذا السيرفر' });
     const guild = client.guilds.cache.get(req.params.id);
