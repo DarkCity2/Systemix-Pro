@@ -29,7 +29,7 @@ async function api(url, opts = {}) {
   if (method !== 'GET') o.body = JSON.stringify(opts.body ?? {});
   const r = await fetch(url, o);
   let d = null; try { d = await r.json(); } catch {}
-  if (r.status === 401 && !url.includes('/api/me')) { ME = null; route(); }
+  if (r.status === 401 && !url.includes('/api/me') && !url.includes('/auth/login')) { ME = null; route(); }
   if (!r.ok) throw new Error(d?.error || `خطأ ${r.status}`);
   return d;
 }
@@ -60,11 +60,53 @@ async function route() {
   const [, sec, gid, mod] = (location.hash || '#/').split('/');
   if (NAVSTACK[NAVSTACK.length - 1] !== location.hash) NAVSTACK.push(location.hash || '#/');
   if (NAVSTACK.length > 40) NAVSTACK.shift();
-  if (ME === null) { try { ME = await api('/api/me'); } catch { ME = false; } }
-  if (!ME) { GID = null; return landing(); }
+
+  // فحص تسجيل الدخول والباسورد
+  if (ME === null) {
+    try {
+      ME = await api('/api/me');
+    } catch (e) {
+      if (e.message.includes('Password Required') || e.message.includes('401')) {
+        return passwordScreen();
+      }
+      ME = false;
+    }
+  }
+  if (!ME) { GID = null; return passwordScreen(); }
   if (sec === 'g' && gid) return openGuild(gid, mod || 'overview');
   GID = null; META = null;
   picker();
+}
+
+function passwordScreen() {
+  const passwordInput = h('input', { type: 'password', placeholder: 'أدخل كلمة المرور الحصرية...', style: 'padding:12px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:#fff;font-size:1rem;width:100%;margin-bottom:16px;' });
+  const submitBtn = h('button', { class: 'btn primary', style: 'width:100%;padding:12px;font-size:1rem;' }, '🔒 دَفْع / دخول');
+
+  const doLogin = async () => {
+    submitBtn.disabled = true;
+    try {
+      await api('/auth/login', { method: 'POST', body: { password: passwordInput.value } });
+      toast('✅ تم تسجيل الدخول بنجاح');
+      ME = null;
+      route();
+    } catch (err) {
+      toast(err.message || 'كلمة المرور غير صحيحة', true);
+      submitBtn.disabled = false;
+    }
+  };
+
+  submitBtn.onclick = doLogin;
+  passwordInput.onkeydown = e => { if (e.key === 'Enter') doLogin(); };
+
+  app.replaceChildren(h('div', { class: 'landing', style: 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;' },
+    h('div', { class: 'card', style: 'width:100%;max-width:400px;padding:32px;text-align:center;' },
+      h('img', { class: 'logo', src: '/logo.png', alt: 'Systemix', style: 'width:64px;height:64px;margin-bottom:16px;' }),
+      h('h2', { style: 'margin-bottom:8px;' }, 'لوحة تحكم Systemix'),
+      h('p', { class: 'hint', style: 'margin-bottom:24px;' }, 'الرجاء إدخال كلمة المرور للوصول إلى النظام'),
+      passwordInput,
+      submitBtn
+    )
+  ));
 }
 
 function landing() {
@@ -256,8 +298,7 @@ async function pConfig(main, k, def) {
   main.append(bar);
 }
 
-
-/* ---------------- اللوقات (مثل ProBot) ---------------- */
+/* ---------------- اللوقات ---------------- */
 const toggleEl = (val, onchange) => h('label', { class: 'switch' },
   h('input', { type: 'checkbox', checked: !!val, onchange: e => onchange(e.target.checked) }), h('span', { class: 'slider' }));
 
@@ -284,7 +325,7 @@ function logEventsEl(f, root) {
         toggleEl(ev[k].on, v => { ev[k].on = v; draw(); }),
         h('span', { class: 'lg-l' }, `${icon} ${label}`),
         selectEl(chOpts('channel'), ev[k].channelId, v => { ev[k].channelId = v; }, '↩ الروم الافتراضي'),
-        h('button', { class: 'btn sm', title: 'إرسال لوق تجريبي بنفس التصميم', onclick: () => test(k) }, '🧪'))));
+        h('button', { class: 'btn sm', title: 'إرسال لوق تجريبي', onclick: () => test(k) }, '🧪'))));
   };
   const draw = () => box.replaceChildren(...f.groups.map(groupCard));
   draw();
@@ -292,10 +333,9 @@ function logEventsEl(f, root) {
   const quick = h('div', { class: 'card' }, h('h4', {}, '⚡ إجراءات سريعة'),
     h('div', { class: 'row' },
       selectEl(chOpts('channel'), '', v => { allCh = v; }, 'اختر روم لكل الأحداث'),
-      h('button', { class: 'btn sm', onclick: () => { if (!allCh) return toast('اختر الروم أول', true); keys.forEach(k => { ev[k].channelId = allCh; }); draw(); toast('تم — لا تنسى تحفظ'); } }, '📍 تطبيق الروم على الكل'),
+      h('button', { class: 'btn sm', onclick: () => { if (!allCh) return toast('اختر الروم أول', true); keys.forEach(k => { ev[k].channelId = allCh; }); draw(); toast('تم'); } }, '📍 تطبيق الروم على الكل'),
       h('button', { class: 'btn sm', onclick: () => { keys.forEach(k => { ev[k].on = true; }); draw(); } }, '✅ تفعيل الكل'),
-      h('button', { class: 'btn sm danger', onclick: () => { keys.forEach(k => { ev[k].on = false; }); draw(); } }, '⛔ إيقاف الكل')),
-    h('div', { class: 'hint', style: 'margin-top:8px' }, 'زر 🧪 يرسل لوق تجريبي لمعاينة الشكل. اللوقات تعرض «بواسطة» من سجل التدقيق، فتأكد أن للبوت صلاحية View Audit Log.'));
+      h('button', { class: 'btn sm danger', onclick: () => { keys.forEach(k => { ev[k].on = false; }); draw(); } }, '⛔ إيقاف الكل')));
   return h('div', {}, quick, box);
 }
 
@@ -312,7 +352,7 @@ const CHTYPE = { 0: ['#', 'روم نصي'], 2: ['🔊', 'روم صوتي'], 4: [
 async function pTrash(main) {
   const box = h('div');
   main.append(
-    h('div', { class: 'banner' }, h('b', {}, '♻️ كيف تشتغل؟'), h('p', {}, 'أي رتبة أو روم ينحذف من السيرفر (حتى لو اللوقات مطفية) يحفظه Systemix 30 يوم بكل تفاصيله: الاسم، اللون، الصلاحيات، ترتيبه، وأعضاء الرتبة. اضغط «استعادة» ويرجع كل شي كان. مفيد جداً ضد الحذف بالغلط أو الهجمات (Nuke).')),
+    h('div', { class: 'banner' }, h('b', {}, '♻️ كيف تشتغل؟'), h('p', {}, 'أي رتبة أو روم ينحذف يحفظه Systemix 30 يوم بكل تفاصيله.')),
     box);
   const draw = async () => {
     const list = await api(`/api/guilds/${GID}/trash`);
@@ -320,25 +360,25 @@ async function pTrash(main) {
       const role = it.kind === 'role';
       const col = role ? (it.info.color ? '#' + it.info.color.toString(16).padStart(6, '0') : '#99aab5') : null;
       const [ic, tn] = role ? ['🎭', 'رتبة'] : (CHTYPE[it.info.type] || ['#', 'روم']);
-      const detail = role ? `${it.info.members} عضو كانوا فيها` : [tn, it.info.parent && `📁 ${it.info.parent}`, it.info.children ? `${it.info.children} روم بداخله` : ''].filter(Boolean).join(' • ');
+      const detail = role ? `${it.info.members} عضو` : [tn, it.info.parent && `📁 ${it.info.parent}`].filter(Boolean).join(' • ');
       const rb = h('button', { class: 'btn primary sm' }, '♻️ استعادة');
       rb.onclick = async () => {
         rb.disabled = true;
         try {
-          const r = await api(`/api/guilds/${GID}/trash/${it.id}/restore`, { method: 'POST' });
-          toast(`✅ تمت استعادة ${role ? 'الرتبة' : 'الروم'} «${r.name}»` + (r.members ? ` وجاري إرجاع ${r.members} عضو` : '') + (r.trimmed ? ' (بعض الصلاحيات ما أقدر أعطيها)' : ''));
+          await api(`/api/guilds/${GID}/trash/${it.id}/restore`, { method: 'POST' });
+          toast('✅ تمت الاستعادة');
           draw();
         } catch (e) { toast(e.message, true); rb.disabled = false; }
       };
       const del = h('button', { class: 'btn danger sm', onclick: async () => {
-        if (!confirm('حذف نهائي من السلة؟')) return;
+        if (!confirm('حذف نهائي؟')) return;
         try { await api(`/api/guilds/${GID}/trash/${it.id}`, { method: 'DELETE' }); draw(); } catch (e) { toast(e.message, true); }
       } }, '🗑️');
       return h('div', { class: 'tcard', style: col ? `--c:${col}` : '' },
         h('div', { class: 'tic' }, ic),
         h('div', { class: 'tinfo' }, h('b', { style: col ? `color:${col}` : '' }, it.name), h('small', {}, detail), h('small', { class: 'hint' }, `حذفها ${it.by} • ${timeAgo(it.at)}`)),
         h('div', { class: 'tact' }, rb, del));
-    })) : h('div', { class: 'card empty' }, '✨ السلة فاضية — ما انحذف شي مؤخراً.'));
+    })) : h('div', { class: 'card empty' }, '✨ السلة فاضية.'));
   };
   await draw();
 }
@@ -352,13 +392,10 @@ async function heatmapEl() {
   const max = Math.max(1, ...grid.flat());
   const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
   const hr = x => `${x % 12 || 12}${x < 12 ? 'ص' : 'م'}`;
-  const cells = []; grid.forEach((r, d) => r.forEach((v, x) => cells.push({ d, x, v })));
-  const peak = cells.sort((a, b) => b.v - a.v).filter(c => c.v > 0).slice(0, 3).map(c => `${days[c.d]} ${hr(c.x)}`);
-  return h('div', { class: 'card' }, h('h4', {}, '🔥 خريطة النشاط (حسب توقيتك)'),
+  return h('div', { class: 'card' }, h('h4', {}, '🔥 خريطة النشاط'),
     h('div', { class: 'tw' }, h('div', { class: 'heat' },
       h('span', {}), Array.from({ length: 24 }, (_, x) => h('span', { class: 'hh' }, x % 3 === 0 ? hr(x) : '')),
-      grid.map((r, d) => [h('span', { class: 'hd' }, days[d]), ...r.map((v, x) => h('i', { title: `${days[d]} ${hr(x)}: ${v} رسالة`, style: `background:rgba(139,61,255,${(0.07 + 0.93 * v / max).toFixed(2)})` }))]))),
-    h('div', { class: 'hint', style: 'margin-top:10px' }, peak.length ? `🎯 أفضل أوقات الفعاليات والإعلانات: ${peak.join(' • ')}` : 'تحتاج بيانات رسائل أكثر عشان تظهر الأوقات الذهبية.'));
+      grid.map((r, d) => [h('span', { class: 'hd' }, days[d]), ...r.map((v, x) => h('i', { title: `${days[d]} ${hr(x)}: ${v}`, style: `background:rgba(139,61,255,${(0.07 + 0.93 * v / max).toFixed(2)})` }))]))));
 }
 
 /* ---------------- رسوم بيانية ---------------- */
@@ -370,7 +407,7 @@ function barsEl(days, key, label, color) {
 }
 async function statsCharts(main) {
   const days = await api(`/api/guilds/${GID}/stats`);
-  main.append(h('div', { class: 'two' }, barsEl(days, 'joins', '📥 الداخلين (آخر 14 يوم)', 'linear-gradient(#3ddc97,#16a06a)'), barsEl(days, 'leaves', '📤 الخارجين', 'linear-gradient(#ff5470,#b91c3c)')),
+  main.append(h('div', { class: 'two' }, barsEl(days, 'joins', '📥 الداخلين', 'linear-gradient(#3ddc97,#16a06a)'), barsEl(days, 'leaves', '📤 الخارجين', 'linear-gradient(#ff5470,#b91c3c)')),
     barsEl(days, 'msgs', '💬 الرسائل', 'linear-gradient(#c084fc,#8b3dff)'));
   try { main.append(await heatmapEl()); } catch {}
 }
@@ -380,7 +417,7 @@ const stat = (l, v) => h('div', { class: 'stat' }, h('small', {}, l), h('b', {},
 const caseTable = list => h('div', { class: 'tw' }, h('table', { class: 'tbl' },
   h('thead', {}, h('tr', {}, ['#', 'الإجراء', 'العضو', 'المسؤول', 'السبب', 'الوقت'].map(t => h('th', {}, t)))),
   h('tbody', {}, list.length ? list.map(c => h('tr', {},
-    h('td', {}, '#' + c.id), h('td', {}, h('span', { class: 'tag t-' + c.type }, LABELS[c.type] || c.type, c.minutes ? ` (${c.minutes}د)` : '')),
+    h('td', {}, '#' + c.id), h('td', {}, h('span', { class: 'tag t-' + c.type }, LABELS[c.type] || c.type)),
     h('td', {}, `${c.userTag} `, h('small', { class: 'hint' }, c.userId)), h('td', {}, c.modTag), h('td', {}, c.reason), h('td', {}, fmtDate(c.at)))) : h('tr', {}, h('td', { colspan: 6, style: 'text-align:center;color:var(--muted)' }, 'لا توجد حالات')))));
 const LABELS = { warn: 'تحذير', kick: 'طرد', ban: 'حظر', timeout: 'كتم', unban: 'فك حظر', untimeout: 'فك كتم' };
 
@@ -389,10 +426,10 @@ async function pOverview(main) {
   const up = o.bot.uptime, upTxt = `${Math.floor(up / 3600)}س ${Math.floor(up % 3600 / 60)}د`;
   main.append(
     h('div', { class: 'stats' }, stat('👥 الأعضاء', o.guild.members), stat('📥 دخلوا اليوم', o.today.joins), stat('📤 خرجوا اليوم', o.today.leaves),
-      stat('💬 رسائل اليوم', o.today.msgs), stat('🏓 سرعة البوت', o.bot.ping + 'ms'), stat('⏱️ مدة التشغيل', upTxt), stat('💎 البوستات', o.guild.boosts)),
-    barsEl(days, 'msgs', '💬 نشاط الرسائل (آخر 14 يوم)', 'linear-gradient(#c084fc,#8b3dff)'),
-    h('div', { class: 'card' }, h('h4', {}, '🧩 حالة الأنظمة (اضغط للإعداد)'),
-      h('div', { class: 'mods' }, Object.keys(o.enabled).map(k => h('a', { class: 'mchip', href: `#/g/${GID}/${k}` }, MODULES[k].icon, MODULES[k].title, h('span', { class: 'dot' + (o.enabled[k] ? ' on' : '') }))))),
+      stat('💬 رسائل اليوم', o.today.msgs), stat('🏓 سرعة البوت', o.bot.ping + 'ms'), stat('⏱️ التشغيل', upTxt), stat('💎 البوستات', o.guild.boosts)),
+    barsEl(days, 'msgs', '💬 نشاط الرسائل', 'linear-gradient(#c084fc,#8b3dff)'),
+    h('div', { class: 'card' }, h('h4', {}, '🧩 حالة الأنظمة'),
+      h('div', { class: 'mods' }, Object.keys(o.enabled).map(k => MODULES[k] ? h('a', { class: 'mchip', href: `#/g/${GID}/${k}` }, MODULES[k].icon, MODULES[k].title, h('span', { class: 'dot' + (o.enabled[k] ? ' on' : '') })) : null))),
     h('div', { class: 'card' }, h('h4', {}, '🗂️ آخر الإجراءات'), caseTable(o.cases))
   );
 }
@@ -401,15 +438,15 @@ async function pEmbed(main) {
   const e = { channelId: '', content: '', author: '', title: '', description: '', color: '#8b3dff', thumbnail: '', image: '', footer: '', fields: [] };
   const defs = [
     { k: 'channelId', t: 'channel', l: 'الروم' },
-    { k: 'content', t: 'textarea', l: 'نص خارج الإيمبد (اختياري)' },
-    { k: 'author', t: 'text', l: 'المؤلف (سطر صغير فوق)' },
+    { k: 'content', t: 'textarea', l: 'نص خارج الإيمبد' },
+    { k: 'author', t: 'text', l: 'المؤلف' },
     { k: 'title', t: 'text', l: 'العنوان' },
     { k: 'description', t: 'textarea', l: 'الوصف' },
     { k: 'color', t: 'color', l: 'اللون' },
-    { k: 'thumbnail', t: 'text', l: 'رابط الصورة الصغيرة' },
-    { k: 'image', t: 'text', l: 'رابط الصورة الكبيرة' },
+    { k: 'thumbnail', t: 'text', l: 'صورة مصغرة' },
+    { k: 'image', t: 'text', l: 'صورة رئيسية' },
     { k: 'footer', t: 'text', l: 'الفوتر' },
-    { k: 'fields', t: 'list', l: 'الحقول (حد أقصى 10)', item: { name: '', value: '', inline: false }, fields: [
+    { k: 'fields', t: 'list', l: 'الحقول', item: { name: '', value: '', inline: false }, fields: [
       { k: 'name', t: 'text', l: 'العنوان' }, { k: 'value', t: 'textarea', l: 'القيمة' }, { k: 'inline', t: 'toggle', l: 'بجانب بعض' }] }
   ];
   const form = h('div', { class: 'form' }, defs.map(d => fieldEl(d, e)));
@@ -429,7 +466,6 @@ async function pEmbed(main) {
         e.footer ? h('div', { class: 'f' }, e.footer) : null));
   };
   ['input', 'change'].forEach(ev => form.addEventListener(ev, draw));
-  form.addEventListener('click', () => setTimeout(draw, 0));
   draw();
   const send = h('button', { class: 'btn primary' }, '📤 إرسال الإيمبد');
   send.onclick = async () => {
@@ -438,7 +474,7 @@ async function pEmbed(main) {
     catch (er) { toast(er.message, true); }
     send.disabled = false;
   };
-  main.append(h('div', { class: 'two' }, form, h('div', {}, h('div', { class: 'card', style: 'position:sticky;top:20px' }, h('h4', {}, '👁️ معاينة مباشرة'), prev))), h('div', { class: 'savebar' }, send));
+  main.append(h('div', { class: 'two' }, form, h('div', {}, h('div', { class: 'card', style: 'position:sticky;top:20px' }, h('h4', {}, '👁️ معاينة'), prev))), h('div', { class: 'savebar' }, send));
 }
 
 async function pLeaderboard(main) {
@@ -448,19 +484,17 @@ async function pLeaderboard(main) {
     box.replaceChildren(
       h('div', { class: 'card' }, h('h4', {}, '🔗 رابط الترتيب العام'),
         h('div', { class: 'row' }, h('input', { type: 'text', value: link, readonly: true }),
-          h('button', { class: 'btn sm', onclick: () => { navigator.clipboard?.writeText(link); toast('تم النسخ'); } }, 'نسخ'),
-          h('a', { class: 'btn sm', href: link, target: '_blank' }, 'فتح')),
-        h('div', { class: 'hint', style: 'margin-top:8px' }, 'الصفحة تظهر فقط لو فعّلت المستويات وخيار «صفحة الترتيب العامة».')),
+          h('button', { class: 'btn sm', onclick: () => { navigator.clipboard?.writeText(link); toast('تم النسخ'); } }, 'نسخ'))),
       h('div', { class: 'card tw' }, h('table', { class: 'tbl' },
         h('thead', {}, h('tr', {}, ['#', 'العضو', 'المستوى', 'الخبرة', 'الرسائل', ''].map(t => h('th', {}, t)))),
         h('tbody', {}, list.length ? list.map(u => h('tr', {},
           h('td', {}, u.rank), h('td', {}, h('img', { class: 'av', src: avatar(u.id, u.avatar, 64), alt: '' }), u.name),
           h('td', {}, u.level), h('td', {}, u.xp), h('td', {}, u.msgs),
           h('td', {}, h('button', { class: 'btn sm', onclick: async () => {
-            const v = prompt('الخبرة الجديدة (0 = حذف العضو من الترتيب):', u.xp);
+            const v = prompt('الخبرة الجديدة:', u.xp);
             if (v === null) return;
             try { await api(`/api/guilds/${GID}/xp`, { method: 'POST', body: { userId: u.id, xp: Number(v) } }); toast('✅ تم'); draw(); } catch (e) { toast(e.message, true); }
-          } }, '✏️ تعديل')))) : h('tr', {}, h('td', { colspan: 6, style: 'text-align:center;color:var(--muted)' }, 'لا يوجد بيانات بعد')))))
+          } }, '✏️ تعديل')))) : h('tr', {}, h('td', { colspan: 6, style: 'text-align:center;color:var(--muted)' }, 'لا يوجد بيانات')))))
     );
   };
   const box = h('div');
@@ -472,8 +506,8 @@ async function pActions(main) {
   const f = { type: 'warn', userId: '', minutes: 10, reason: '' };
   const defs = [
     { k: 'type', t: 'select', l: 'الإجراء', options: Object.entries(LABELS) },
-    { k: 'userId', t: 'text', l: 'ايدي العضو', hint: 'كليك يمين على العضو ← Copy User ID' },
-    { k: 'minutes', t: 'number', l: 'مدة الكتم (دقائق)' },
+    { k: 'userId', t: 'text', l: 'ايدي العضو' },
+    { k: 'minutes', t: 'number', l: 'مدة الكتم' },
     { k: 'reason', t: 'text', l: 'السبب' }
   ];
   const go = h('button', { class: 'btn primary' }, 'تنفيذ');
@@ -494,7 +528,7 @@ async function pActions(main) {
     h('div', { class: 'card' }, h('h4', {}, '🗂️ الحالات'),
       h('div', { class: 'row', style: 'margin-bottom:12px' },
         selectEl(Object.entries(LABELS), '', v => { q.type = v; load(); }, 'كل الأنواع'),
-        h('input', { type: 'text', placeholder: 'بحث بالاسم أو الايدي', oninput: e => { q.q = e.target.value; clearTimeout(load.t); load.t = setTimeout(load, 300); } })),
+        h('input', { type: 'text', placeholder: 'بحث', oninput: e => { q.q = e.target.value; clearTimeout(load.t); load.t = setTimeout(load, 300); } })),
       tableBox));
   await load();
 }
