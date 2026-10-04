@@ -6,32 +6,41 @@ const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('disco
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+app.use(express.json());
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
-// حل مشكلة زر تسجيل الدخول: توجيه مسار الدخول مباشرة للوحة التحكم أو الصفحة الرئيسية
-app.get('/auth/login', (req, res) => {
-    const dashboardPath = path.join(publicPath, 'dashboard.html');
-    if (fs.existsSync(dashboardPath)) {
-        res.sendFile(dashboardPath);
-    } else {
-        res.sendFile(path.join(publicPath, 'index.html'));
+// مسار التحقق من تسجيل الدخول للواجهة الأمامية (app.js)
+app.get('/api/me', (req, res) => {
+    // مؤقتاً لتجاوز مشكلة تسجيل الدخول وتجربة الواجهة بشكل كامل، أو يمكنك ربطه بجلسة ديسكورد حقيقية
+    if (req.session && req.session.user) {
+        return res.json({ user: req.session.user, guilds: req.session.guilds || [] });
     }
+    
+    // وضع تجريبي مؤقت إذا أردت رؤية اللوحة وتجاوز صفحة الدخول فوراً:
+    // (أزل التعليق عن السطر التالي لو تبغى تدخل اللوحة وتجربها مباشرة)
+    /*
+    return res.json({
+        user: { id: '123456789', username: 'Admin', avatar: null },
+        guilds: []
+    });
+    */
+    
+    res.status(401).json({ error: 'Unauthorized' });
 });
 
-app.get('/auth/discord/callback', (req, res) => {
+// مسار تسجيل الدخول عبر ديسكورد (يتم توجيهه لاحقاً لمصادقة Discord OAuth2)
+app.get('/auth/login', (req, res) => {
+    // هنا يتم وضع رابط المصادقة الحقيقي لـ Discord OAuth2 أو توجيهه للوحة
     res.redirect('/');
 });
 
-app.get('/dashboard', (req, res) => {
-    const dashboardPath = path.join(publicPath, 'dashboard.html');
-    if (fs.existsSync(dashboardPath)) {
-        res.sendFile(dashboardPath);
-    } else {
-        res.sendFile(path.join(publicPath, 'index.html'));
-    }
+app.get('/auth/logout', (req, res) => {
+    if (req.session) req.session.destroy();
+    res.redirect('/');
 });
 
+// دعم مسارات الـ SPA المعتمدة على hash routing في app.js
 app.get('*', (req, res) => {
     const indexPath = path.join(publicPath, 'index.html');
     if (fs.existsSync(indexPath)) {
@@ -41,6 +50,7 @@ app.get('*', (req, res) => {
     }
 });
 
+// تشغيل السيرفر مرة واحدة فقط
 if (!global.serverStarted) {
     global.serverStarted = true;
     app.listen(PORT, () => {
@@ -48,6 +58,7 @@ if (!global.serverStarted) {
     });
 }
 
+// إعداد وتشغيل بوت الديسكورد
 const client = new Client({
   intents: [
     I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent,
@@ -58,6 +69,7 @@ const client = new Client({
 });
 
 client.commands = new Collection();
+
 const loadFiles = dir => {
     const fullDir = path.join(__dirname, dir);
     if (fs.existsSync(fullDir)) {
@@ -75,4 +87,5 @@ for (const m of loadFiles('events')) {
 }
 
 client.login(process.env.TOKEN);
+
 module.exports = client;
