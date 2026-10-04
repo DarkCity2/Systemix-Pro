@@ -1,31 +1,69 @@
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
-const basicAuth = require('express-basic-auth');
+const session = require('express-session');
+const passport = require('passport');
+const { Strategy: DiscordStrategy } = require('passport-discord');
 const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('discord.js');
 
-// 1. إعداد السيرفر واللوحة
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(basicAuth({
-    users: { 
-        'admin': process.env.DASHBOARD_PASSWORD || '123456' 
-    },
-    challenge: true,
-    unauthorizedResponse: 'عذراً، كلمة السر غير صحيحة!'
+// إعداد الجلسات (Sessions) لتسجيل الدخول
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'systemix_secret_key_123',
+    resave: false,
+    saveUninitialized: false
 }));
 
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((obj, done) => done(null, obj));
+
+// إعداد استراتيجية ديسكورد (تأكد أنك حاط الرابط الصحيح في Discord Developer Portal)
+if (process.env.CLIENT_ID && process.env.CLIENT_SECRET) {
+    passport.use(new DiscordStrategy({
+        clientID: process.env.CLIENT_ID,
+        clientSecret: process.env.CLIENT_SECRET,
+        callbackURL: process.env.CALLBACK_URL || `https://${process.env.RENDER_EXTERNAL_HOSTNAME || 'localhost:10000'}/auth/discord/callback`,
+        scope: ['identify', 'guilds']
+    }, (accessToken, refreshToken, profile, done) => {
+        return done(null, profile);
+    }));
+}
+
+// مسارات تسجيل الدخول
+app.get('/auth/login', passport.authenticate('discord'));
+app.get('/auth/discord/callback', passport.authenticate('discord', {
+    failureRedirect: '/'
+}), (req, res) => {
+    res.redirect('/dashboard'); // أو الانتقال للوحة التحكم بعد تسجيل الدخول
+});
+
+app.get('/auth/logout', (req, res) => {
+    req.logout(() => {
+        res.redirect('/');
+    });
+});
+
+// الملفات الثابتة
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
-// التعامل مع أي مسار في الواجهة لكي لا يظهر خطأ Cannot GET
+// حماية لوحة التحكم بحيث لا يخول إلا المسجلين (اختياري)
+app.get('/dashboard', (req, res) => {
+    if (!req.isAuthenticated()) return res.redirect('/auth/login');
+    res.sendFile(path.join(publicPath, 'dashboard.html')); // أو index.html حسب ملفاتك
+});
+
 app.get('*', (req, res) => {
     const indexPath = path.join(publicPath, 'index.html');
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
-        res.status(404).send('Dashboard files not found!');
+        res.status(404).send('Not Found');
     }
 });
 
@@ -37,7 +75,7 @@ if (!global.serverStarted) {
     });
 }
 
-// 2. إعداد وتشغيل بوت الديسكورد
+// إعداد بوت الديسكورد
 const client = new Client({
   intents: [
     I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent,
