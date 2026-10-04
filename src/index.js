@@ -10,7 +10,7 @@ if (!cfg.token || !cfg.clientId || !cfg.clientSecret) {
 // 1. تشغيل البوت
 const client = require('./bot');
 
-// 2. تشغيل السيرفر ومنع أي تعارض منافذ
+// 2. إعداد السيرفر وتشغيله مرة واحدة فقط بشرط عدم التكرار
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -32,9 +32,14 @@ app.get('/api/stats', (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-    console.log(`🚀 Server is running on port ${PORT}`);
-});
+
+// التحقق من تشغيل السيرفر مرة واحدة فقط لعدم حدوث EADDRINUSE
+if (!global.serverStarted) {
+    global.serverStarted = true;
+    app.listen(PORT, () => {
+        console.log(`🚀 Server is running on port ${PORT}`);
+    });
+}
 
 // 3. تسديل دخول البوت
 client.login(cfg.token);
