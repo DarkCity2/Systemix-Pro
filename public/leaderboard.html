@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>الترتيب — Systemix</title>
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="root" class="lb"></div>
+<script>
+const CDN='https://cdn.discordapp.com';
+const root=document.getElementById('root');
+const gid=location.pathname.split('/').filter(Boolean).pop();
+const av=(id,h)=>h?`${CDN}/avatars/${id}/${h}.png?size=128`:`${CDN}/embed/avatars/${Number((BigInt(id)>>22n)%6n)}.png`;
+const el=(t,c,...k)=>{const e=document.createElement(t);if(c)e.className=c;k.flat().forEach(x=>x!=null&&e.append(x.nodeType?x:document.createTextNode(String(x))));return e;};
+const img=(src,c)=>{const i=document.createElement('img');i.src=src;i.alt='';if(c)i.className=c;return i;};
+fetch('/api/public/leaderboard/'+encodeURIComponent(gid)).then(r=>r.ok?r.json():Promise.reject()).then(d=>{
+  document.title='ترتيب '+d.guild.name+' — Systemix';
+  const gi=el('div','gicon');
+  if(d.guild.icon)gi.append(img(`${CDN}/icons/${d.guild.id}/${d.guild.icon}.png?size=256`));else gi.textContent=d.guild.name.slice(0,2);
+  root.append(el('div','head',gi,el('h1',null,d.guild.name),el('p',null,'🏆 لوحة المتصدرين • '+d.guild.members+' عضو')));
+  root.firstChild.querySelector('p').style.color='var(--muted)';
+  const medals=['🥇','🥈','🥉'];
+  const top=d.entries.slice(0,3);
+  if(top.length){
+    const order=[1,0,2].filter(i=>top[i]);
+    root.append(el('div','podium',order.map(i=>{const u=top[i];return el('div','pod p'+(i+1),el('div','m',medals[i]),img(av(u.id,u.avatar)),el('b',null,u.name),el('small',null,'المستوى '+u.level+' • '+u.xp+' XP'));})));
+  }
+  d.entries.slice(3).forEach(u=>root.append(el('div','lrow',el('div','rk','#'+u.rank),img(av(u.id,u.avatar)),el('div','nm',el('b',null,u.name),el('small',null,u.msgs+' رسالة')),el('div','lv',el('b',null,'Lv '+u.level),el('br'),el('small',null,u.xp+' XP')))));
+  if(!d.entries.length)root.append(el('div','card','ما فيه بيانات بعد — ابدأوا بالسوالف! 💬'));
+}).catch(()=>{
+  root.append(el('div','card','❌ الترتيب غير متاح لهذا السيرفر.'),el('a','btn','الرجوع'));
+  root.lastChild.href='/';
+});
+</script>
+</body>
+</html>

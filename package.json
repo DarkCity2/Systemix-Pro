@@ -1,0 +1,20 @@
+{
+  "name": "systemix",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Systemix — بوت ديسكورد متكامل مع لوحة تحكم ويب",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-basic-auth": "^1.2.1",
+    "express-session": "^1.18.0"
+  }
+}
