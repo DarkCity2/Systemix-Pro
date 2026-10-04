@@ -1,30 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('discord.js');
-const express = require('express');
-const basicAuth = require('express-basic-auth'); // استدعاء مكتبة الحماية
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// نظام الحماية بكلمة السر للوحة التحكم
-app.use(basicAuth({
-    users: { 
-        'admin': process.env.DASHBOARD_PASSWORD || '123456' // اسم المستخدم: admin | كلمة السر الافتراضية: 123456
-    },
-    challenge: true, // إظهار نافذة إدخال كلمة السر تلقائياً بالمتصفح
-    unauthorizedResponse: 'عذراً، كلمة السر غير صحيحة!'
-}));
-
-// تشغيل لوحة التحكم أو صفحة الويب
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('/', (req, res) => {
-    res.send('Dashboard is running!');
-});
-
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
 
 const client = new Client({
   intents: [
