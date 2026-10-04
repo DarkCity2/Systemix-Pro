@@ -4,7 +4,7 @@ const express = require('express');
 const basicAuth = require('express-basic-auth');
 const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('discord.js');
 
-// 1. إعداد السيرفر واللوحة
+// 1. إعداد السيرفر واللوحة (Express + الحماية)
 const app = express();
 const PORT = process.env.PORT || 10000;
 
@@ -16,17 +16,21 @@ app.use(basicAuth({
     unauthorizedResponse: 'عذراً، كلمة السر غير صحيحة!'
 }));
 
-// ربط مجلد الـ public الخاص باللوحة
-const publicPath = path.join(__dirname, 'web', 'public');
+// تحديد المسار الصحيح لمجلد public الرئيسي في المشروع
+const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(publicPath, 'index.html'));
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server is running on port ${PORT}`);
-});
+// تشغيل السيرفر مرة واحدة فقط وبشكل آمن
+if (!global.serverStarted) {
+    global.serverStarted = true;
+    app.listen(PORT, () => {
+        console.log(`🚀 Server is running on port ${PORT}`);
+    });
+}
 
 // 2. إعداد وتشغيل بوت الديسكورد
 const client = new Client({
@@ -41,7 +45,7 @@ const client = new Client({
 client.commands = new Collection();
 
 const loadFiles = dir => {
-    const fullDir = path.join(__dirname, 'bot', dir);
+    const fullDir = path.join(__dirname, dir);
     if (fs.existsSync(fullDir)) {
         return fs.readdirSync(fullDir).filter(f => f.endsWith('.js')).map(f => require(path.join(fullDir, f)));
     }
