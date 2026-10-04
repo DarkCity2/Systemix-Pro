@@ -6,21 +6,18 @@ const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('disco
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// مجلد الملفات الثابتة
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
-// توجيه جميع المسارات لـ index.html عشان يشتغل نظام الـ SPA (app.js و modules.js) بسلاسة
 app.get('*', (req, res) => {
     const indexPath = path.join(publicPath, 'index.html');
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
-        res.status(404).send('index.html not found');
+        res.status(404).send('Not Found');
     }
 });
 
-// تشغيل السيرفر مرة واحدة فقط
 if (!global.serverStarted) {
     global.serverStarted = true;
     app.listen(PORT, () => {
@@ -28,7 +25,6 @@ if (!global.serverStarted) {
     });
 }
 
-// إعداد وتشغيل بوت الديسكورد
 const client = new Client({
   intents: [
     I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent,
@@ -39,7 +35,6 @@ const client = new Client({
 });
 
 client.commands = new Collection();
-
 const loadFiles = dir => {
     const fullDir = path.join(__dirname, dir);
     if (fs.existsSync(fullDir)) {
@@ -57,5 +52,4 @@ for (const m of loadFiles('events')) {
 }
 
 client.login(process.env.TOKEN);
-
 module.exports = client;
