@@ -6,7 +6,7 @@ const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('disco
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// مسار تسجيل الدخول الذي يوجه المستخدم مباشرة لصفحة تفويض ديسكورد
+// مسار تسجيل الدخول
 app.get('/auth/login', (req, res) => {
     const clientId = process.env.CLIENT_ID;
     const redirectUri = encodeURIComponent(`https://${req.get('host')}/auth/discord/callback`);
@@ -14,9 +14,13 @@ app.get('/auth/login', (req, res) => {
     res.redirect(discordAuthUrl);
 });
 
-// مسار الـ Callback بعد الموافقة
+// مسار الـ Callback (يستقبل الكود من ديسكورد ويدخلك للوحة)
 app.get('/auth/discord/callback', (req, res) => {
-    // بعد نجاح التحقق، تحويل المستخدم إلى لوحة التحكم أو الصفحة الرئيسية
+    const { code } = req.query;
+    if (!code) {
+        return res.redirect('/');
+    }
+    // مؤقتاً بعد نجاح التفويض يتم توجيهك للوحة التحكم مباشرة
     res.redirect('/dashboard');
 });
 
