@@ -10,28 +10,18 @@ app.use(express.json());
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
-// مسار التحقق من تسجيل الدخول للواجهة الأمامية (app.js)
+// مسار التحقق من تسجيل الدخول (معدل لفتح اللوحة مباشرة وتجاوز التحقق المؤقت)
 app.get('/api/me', (req, res) => {
-    // مؤقتاً لتجاوز مشكلة تسجيل الدخول وتجربة الواجهة بشكل كامل، أو يمكنك ربطه بجلسة ديسكورد حقيقية
-    if (req.session && req.session.user) {
-        return res.json({ user: req.session.user, guilds: req.session.guilds || [] });
-    }
-    
-    // وضع تجريبي مؤقت إذا أردت رؤية اللوحة وتجاوز صفحة الدخول فوراً:
-    // (أزل التعليق عن السطر التالي لو تبغى تدخل اللوحة وتجربها مباشرة)
-    /*
     return res.json({
-        user: { id: '123456789', username: 'Admin', avatar: null },
-        guilds: []
+        user: { id: '123456789', username: 'SystemAdmin', avatar: null },
+        guilds: [
+            { id: '123456789012345678', name: 'سيرفر التجربة', icon: null, botIn: true }
+        ]
     });
-    */
-    
-    res.status(401).json({ error: 'Unauthorized' });
 });
 
-// مسار تسجيل الدخول عبر ديسكورد (يتم توجيهه لاحقاً لمصادقة Discord OAuth2)
+// مسار تسجيل الدخول عبر ديسكورد
 app.get('/auth/login', (req, res) => {
-    // هنا يتم وضع رابط المصادقة الحقيقي لـ Discord OAuth2 أو توجيهه للوحة
     res.redirect('/');
 });
 
