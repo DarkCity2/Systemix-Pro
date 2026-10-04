@@ -1,36 +1,64 @@
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
+const session = require('express-session');
 const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('discord.js');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// تفعيل الجلسات الأساسية عشان نظام الدخول والحماية يشتغل صح
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'systemix-secret-key-change-it',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false } // اضبطها لـ true لو على https بشكل كامل
+}));
+
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
-// مسار التحقق من تسجيل الدخول (معدل لفتح اللوحة مباشرة وتجاوز التحقق المؤقت)
+// ربط ملفات الـ Web أو مسارات المصادقة الأصلية الموجودة في مجلد web إن وجدت
+const webPath = path.join(__dirname, 'web');
+if (fs.existsSync(webPath)) {
+    try {
+        const webModule = require('./web');
+        if (typeof webModule === 'function') {
+            app.use('/api', webModule);
+        }
+    } catch (e) {
+        console.log('ملاحظة حول مجلد web:', e.message);
+    }
+}
+
+// مسار التحقق الحقيقي من الدخول (يرجع 401 إذا لم يتم تسجيل الدخول لحماية الموقع)
 app.get('/api/me', (req, res) => {
-    return res.json({
-        user: { id: '123456789', username: 'SystemAdmin', avatar: null },
-        guilds: [
-            { id: '123456789012345678', name: 'سيرفر التجربة', icon: null, botIn: true }
-        ]
-    });
+    if (req.session && req.session.user) {
+        return res.json({ user: req.session.user, guilds: req.session.guilds || [] });
+    }
+    // هنا يرجع 401 الحقيقي عشان تظهر شاشة تسجيل الدخول / الباسورد الأصلية للواجهة
+    return res.status(401).json({ error: 'Unauthorized' });
 });
 
-// مسار تسجيل الدخول عبر ديسكورد
+// مسار تسجيل الدخول (يمكنك تعديله ليوجه لراوتر الديسكورد الأصلي إذا كان موجوداً في web)
 app.get('/auth/login', (req, res) => {
     res.redirect('/');
 });
 
 app.get('/auth/logout', (req, res) => {
-    if (req.session) req.session.destroy();
-    res.redirect('/');
+    if (req.session) {
+        req.session.destroy(() => {
+            res.redirect('/');
+        });
+    } else {
+        res.redirect('/');
+    }
 });
 
-// دعم مسارات الـ SPA المعتمدة على hash routing في app.js
+// دعم مسارات الـ SPA الحقيقية للواجهة
 app.get('*', (req, res) => {
     const indexPath = path.join(publicPath, 'index.html');
     if (fs.existsSync(indexPath)) {
@@ -48,7 +76,7 @@ if (!global.serverStarted) {
     });
 }
 
-// إعداد وتشغيل بوت الديسكورد
+// إعداد وتشغيل بوت الديسكورد الحقيقي
 const client = new Client({
   intents: [
     I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent,
