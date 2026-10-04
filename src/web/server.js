@@ -27,6 +27,7 @@ function start(client) {
     });
 
     const PORT = process.env.PORT || 10000;
+    // التأكد من عدم تكرار فتح السيرفر إذا كان يعمل مسبقاً
     app.listen(PORT, () => {
         console.log(`🚀 Server is running on port ${PORT}`);
     });
