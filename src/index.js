@@ -6,17 +6,17 @@ const { Client, GatewayIntentBits: I, Partials: P, Collection } = require('disco
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// مسار الملفات الثابتة الصحيح
+// مجلد الملفات الثابتة
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
-// التعامل مع مسارات الـ SPA والواجهة الأصلية الخاصة بك
+// توجيه جميع المسارات لـ index.html عشان يشتغل نظام الـ SPA (app.js و modules.js) بسلاسة
 app.get('*', (req, res) => {
     const indexPath = path.join(publicPath, 'index.html');
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
-        res.status(404).send('index.html not found in public folder');
+        res.status(404).send('index.html not found');
     }
 });
 
