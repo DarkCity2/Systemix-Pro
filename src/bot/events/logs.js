@@ -4,8 +4,18 @@ const L = require('../modules/logger');
 const invites = require('../modules/invites');
 
 const { user: U, ts, dur } = L;
-const on = (g, k) => { const c = db.cfg(g.id).logs; return c.enabled && c.events[k]?.on; };
-const ignored = (g, id) => db.cfg(g.id).logs.ignoredChannels.includes(id);
+
+// تفعيل مباشر ومؤكد لجميع اللوقات للاختبار والعمل الفوري
+const on = (g, k) => {
+  const c = db.cfg(g.id).logs;
+  if (!c) return true;
+  if (c.enabled === false) return false;
+  // إذا مصفوفة الأحداث غير مفعلة صراحة، نعتبرها مفعلة افتراضياً
+  if (!c.events || !c.events[k]) return true;
+  return c.events[k].on !== false;
+};
+
+const ignored = (g, id) => db.cfg(g.id).logs?.ignoredChannels?.includes(id);
 const ex = (en, label = '👮 بواسطة') => en?.executor ? [{ name: label, value: `<@${en.executor.id}> \`${en.executor.username}\``, inline: true }] : [];
 const why = en => en?.reason ? [{ name: '📝 السبب', value: en.reason }] : [];
 const q = t => (t ? '>>> ' + String(t).slice(0, 1000) : '*فاضي*');
@@ -157,7 +167,7 @@ const chCreate = {
   async execute(c) {
     if (!c.guild || !on(c.guild, 'channelCreate')) return;
     const en = await L.who(c.guild, A.ChannelCreate, c.id);
-    L.send(c.guild, 'channelCreate', { desc: `${c} ${chName(c)}`, fields: [{ name: '📂 النوع', value: CT[c.type] || String(c.type), inline: true }, ...(c.parent ? [{ name: '📁 الكاتيجوري', value: c.parent.name, inline: true }] : []), ...ex(en)], id: c.id });
+    L.send(c.guild, 'channelCreate', { desc: `${c}${chName(c)}`, fields: [{ name: '📂 النوع', value: CT[c.type] || String(c.type), inline: true }, ...(c.parent ? [{ name: '📁 الكاتيجوري', value: c.parent.name, inline: true }] : []), ...ex(en)], id: c.id });
   }
 };
 
@@ -182,11 +192,11 @@ const chUpdate = {
     if (!n.guild || n.isThread?.() || !on(n.guild, 'channelUpdate')) return;
     const f = [];
     if (o.name !== n.name) f.push({ name: '📛 الاسم', value: `\`${o.name}\` ← \`${n.name}\``, inline: true });
-    if (o.topic !== n.topic && (o.topic || n.topic)) f.push({ name: '📝 الوصف', value: `${o.topic || '—'} ← ${n.topic || '—'}`.slice(0, 900) });
+    if (o.topic !== n.topic && (o.topic || n.topic)) f.push({ name: '📝 الوصف', value: `${o.topic \vert{}\vert{} '—'} ←${n.topic || '—'}`.slice(0, 900) });
     if (o.nsfw !== n.nsfw) f.push({ name: '🔞 NSFW', value: n.nsfw ? 'تفعيل' : 'إيقاف', inline: true });
-    if (o.rateLimitPerUser !== n.rateLimitPerUser) f.push({ name: '🐌 الوضع البطيء', value: `${o.rateLimitPerUser || 0}ث ← ${n.rateLimitPerUser || 0}ث`, inline: true });
-    if (o.parentId !== n.parentId) f.push({ name: '📁 الكاتيجوري', value: `${o.parent?.name || '—'} ← ${n.parent?.name || '—'}`, inline: true });
-    if (o.userLimit !== n.userLimit) f.push({ name: '👥 حد الأعضاء', value: `${o.userLimit || '∞'} ← ${n.userLimit || '∞'}`, inline: true });
+    if (o.rateLimitPerUser !== n.rateLimitPerUser) f.push({ name: '🐌 الوضع البطيء', value: `${o.rateLimitPerUser \vert{}\vert{} 0}ث ← ${n.rateLimitPerUser || 0}ث`, inline: true });
+    if (o.parentId !== n.parentId) f.push({ name: '📁 الكاتيجوري', value: `${o.parent?.name \vert{}\vert{} '—'} ← ${n.parent?.name || '—'}`, inline: true });
+    if (o.userLimit !== n.userLimit) f.push({ name: '👥 حد الأعضاء', value: `${o.userLimit \vert{}\vert{} '∞'} ←${n.userLimit || '∞'}`, inline: true });
     const oc = o.permissionOverwrites?.cache, nc = n.permissionOverwrites?.cache;
     if (oc && nc) {
       const changed = [...new Set([...oc.keys(), ...nc.keys()])].filter(id => { const a = oc.get(id), b = nc.get(id); return !a || !b || a.allow.bitfield !== b.allow.bitfield || a.deny.bitfield !== b.deny.bitfield; });
@@ -194,7 +204,7 @@ const chUpdate = {
     }
     if (!f.length) return;
     const en = await L.who(n.guild, A.ChannelUpdate, n.id);
-    L.send(n.guild, 'channelUpdate', { desc: `${n} ${chName(n)}`, fields: [...f, ...ex(en)], id: n.id });
+    L.send(n.guild, 'channelUpdate', { desc: `${n}${chName(n)}`, fields: [...f, ...ex(en)], id: n.id });
   }
 };
 
@@ -235,7 +245,7 @@ const roleUpdate = {
     if (!on(n.guild, 'roleUpdate')) return;
     const f = [];
     if (o.name !== n.name) f.push({ name: '📛 الاسم', value: `\`${o.name}\` ← \`${n.name}\`` });
-    if (o.color !== n.color) f.push({ name: '🎨 اللون', value: `${swatch(o.color)} ← ${swatch(n.color)}`, inline: true });
+    if (o.color !== n.color) f.push({ name: '🎨 اللون', value: `${swatch(o.color)} ←${swatch(n.color)}`, inline: true });
     if (o.hoist !== n.hoist) f.push({ name: '📌 عرض منفصل', value: n.hoist ? 'تفعيل' : 'إيقاف', inline: true });
     if (o.mentionable !== n.mentionable) f.push({ name: '📣 قابلة للمنشن', value: n.mentionable ? 'نعم' : 'لا', inline: true });
     const ob = o.permissions.bitfield, nb = n.permissions.bitfield;
