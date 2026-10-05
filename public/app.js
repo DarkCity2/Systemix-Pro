@@ -61,7 +61,6 @@ async function route() {
   if (NAVSTACK[NAVSTACK.length - 1] !== location.hash) NAVSTACK.push(location.hash || '#/');
   if (NAVSTACK.length > 40) NAVSTACK.shift();
 
-  // فحص تسجيل الدخول والباسورد
   if (ME === null) {
     try {
       ME = await api('/api/me');
@@ -86,9 +85,8 @@ function passwordScreen() {
     submitBtn.disabled = true;
     try {
       await api('/auth/login', { method: 'POST', body: { password: passwordInput.value } });
-      toast('✅ تم تسجيل الدخول بنجاح');
-      ME = null;
-      route();
+      toast('✅ كلمة المرور صحيحة، جاري التحويل...');
+      window.location.href = '/auth/discord/login';
     } catch (err) {
       toast(err.message || 'كلمة المرور غير صحيحة', true);
       submitBtn.disabled = false;
@@ -116,7 +114,7 @@ function landing() {
     h('h1', {}, 'Systemix'),
     h('p', {}, 'بوت ديسكورد متكامل بلوحة تحكم احترافية: ترحيب، حماية، مستويات، تذاكر، لوقات، وأكثر — كلها من مكان واحد.'),
     err && h('p', { style: 'color:var(--bad)' }, 'صار خطأ في تسجيل الدخول، حاول مرة ثانية.'),
-    h('a', { class: 'btn primary', href: '/auth/login', style: 'font-size:1.1rem;padding:14px 34px' }, '🔐 تسجيل الدخول عبر Discord'),
+    h('a', { class: 'btn primary', href: '/auth/discord/login', style: 'font-size:1.1rem;padding:14px 34px' }, '🔐 تسجيل الدخول عبر Discord'),
     h('div', { class: 'features' }, ['👋 ترحيب ووداع', '🛡️ Automod', '🚨 Anti-Raid', '🏆 مستويات', '🎫 تذاكر', '📜 لوقات', '⭐ Starboard', '📈 إحصائيات', '🧩 إيمبد', '🎭 رتب ذاتية'].map(t => h('span', {}, t)))
   ));
 }
@@ -125,11 +123,11 @@ function picker() {
   app.replaceChildren(h('div', { class: 'picker' },
     h('div', { class: 'topbar' },
       h('img', { class: 'l', src: '/logo.png', alt: '' }), h('b', { style: 'font-size:1.4rem' }, 'Systemix'), h('div', { class: 'sp' }),
-      h('div', { class: 'user' }, h('img', { src: avatar(ME.user.id, ME.user.avatar, 64), alt: '' }), h('span', {}, ME.user.username)),
+      h('div', { class: 'user' }, ME?.user ? [h('img', { src: avatar(ME.user.id, ME.user.avatar, 64), alt: '' }), h('span', {}, ME.user.username)] : null),
       h('button', { class: 'btn sm', onclick: () => { ME = null; route(); } }, '🔄 تحديث'),
       h('a', { class: 'btn sm', href: '/auth/logout' }, 'خروج')),
     h('h2', { style: 'margin-bottom:16px' }, 'اختر السيرفر'),
-    ME.guilds.length ? h('div', { class: 'grid' }, ME.guilds.map(g => h('div', { class: 'gcard' },
+    ME?.guilds?.length ? h('div', { class: 'grid' }, ME.guilds.map(g => h('div', { class: 'gcard' },
       iconEl(g), h('b', {}, g.name),
       g.botIn ? h('a', { class: 'btn primary sm', href: `#/g/${g.id}/overview` }, '⚙️ إدارة')
         : h('a', { class: 'btn sm', href: g.inviteUrl, target: '_blank', rel: 'noopener' }, '➕ إضافة البوت')
