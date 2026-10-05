@@ -10,7 +10,6 @@ const on = (g, k) => {
   const c = db.cfg(g.id).logs;
   if (!c) return true;
   if (c.enabled === false) return false;
-  // إذا مصفوفة الأحداث غير مفعلة صراحة، نعتبرها مفعلة افتراضياً
   if (!c.events || !c.events[k]) return true;
   return c.events[k].on !== false;
 };
@@ -134,28 +133,28 @@ const memberUpdate = {
     const base = { user: U(n.user), thumb: n.user.displayAvatarURL({ size: 256 }), id: n.id };
 
     if (o.nickname !== n.nickname && on(g, 'memberNickname')) {
-      const en = await L.who(g, A.MemberUpdate, n.id);
-      L.send(g, 'memberNickname', { ...base, desc: `<@${n.id}> تغيّر لقبه`, fields: [{ name: '📜 قبل', value: o.nickname || '*بدون لقب*', inline: true }, { name: '✨ بعد', value: n.nickname || '*بدون لقب*', inline: true }, ...ex(en)] });
+      L.send(g, 'memberNickname', { ...base, desc: `<@${n.id}> تغيّر لقبه`, fields: [{ name: '📜 قبل', value: o.nickname || '*بدون لقب*', inline: true }, { name: '✨ بعد', value: n.nickname || '*بدون لقب*', inline: true }] });
     }
 
     const added = n.roles.cache.filter(r => !o.roles.cache.has(r.id));
     const removed = o.roles.cache.filter(r => !n.roles.cache.has(r.id));
     if ((added.size || removed.size) && on(g, 'memberRoles')) {
-      const en = await L.who(g, A.MemberRoleUpdate, n.id);
       L.send(g, 'memberRoles', {
         ...base, desc: `تم تحديث رتب <@${n.id}>`,
-        fields: [...(added.size ? [{ name: '➕ أُضيفت', value: added.map(r => r.toString()).join(' ') }] : []), ...(removed.size ? [{ name: '➖ أُزيلت', value: removed.map(r => r.toString()).join(' ') }] : []), ...ex(en)]
+        fields: [
+          ...(added.size ? [{ name: '➕ أُضيفت', value: added.map(r => r.toString()).join(' ') }] : []),
+          ...(removed.size ? [{ name: '➖ أُزيلت', value: removed.map(r => r.toString()).join(' ') }] : [])
+        ]
       });
     }
 
     const a = o.communicationDisabledUntilTimestamp, b = n.communicationDisabledUntilTimestamp;
     if (a !== b && on(g, 'memberTimeout')) {
-      const en = await L.who(g, A.MemberUpdate, n.id);
       const set = b && b > Date.now();
       L.send(g, 'memberTimeout', {
         ...base, color: set ? undefined : L.C.green,
         desc: set ? `<@${n.id}> تم كتمه مؤقتاً` : `<@${n.id}> تم فك الكتم عنه`,
-        fields: [...(set ? [{ name: '⏳ ينتهي', value: `<t:${Math.floor(b / 1000)}:R>`, inline: true }] : []), ...ex(en), ...why(en)]
+        fields: [...(set ? [{ name: '⏳ ينتهي', value: `<t:${Math.floor(b / 1000)}:R>`, inline: true }] : [])]
       });
     }
   }
@@ -166,8 +165,7 @@ const chCreate = {
   name: Events.ChannelCreate,
   async execute(c) {
     if (!c.guild || !on(c.guild, 'channelCreate')) return;
-    const en = await L.who(c.guild, A.ChannelCreate, c.id);
-    L.send(c.guild, 'channelCreate', { desc: `${c}${chName(c)}`, fields: [{ name: '📂 النوع', value: CT[c.type] || String(c.type), inline: true }, ...(c.parent ? [{ name: '📁 الكاتيجوري', value: c.parent.name, inline: true }] : []), ...ex(en)], id: c.id });
+    L.send(c.guild, 'channelCreate', { desc: `${c}${chName(c)}`, fields: [{ name: '📂 النوع', value: CT[c.type] || String(c.type), inline: true }, ...(c.parent ? [{ name: '📁 الكاتيجوري', value: c.parent.name, inline: true }] : [])], id: c.id });
   }
 };
 
@@ -175,12 +173,10 @@ const chDelete = {
   name: Events.ChannelDelete,
   async execute(c) {
     if (!c.guild || c.isThread?.() || !on(c.guild, 'channelDelete')) return;
-    const en = await L.who(c.guild, A.ChannelDelete, c.id);
-    const mine = en?.executor?.id === c.client.user.id;
     L.send(c.guild, 'channelDelete', {
       desc: chName(c),
-      fields: [{ name: '📂 النوع', value: CT[c.type] || String(c.type), inline: true }, ...(c.parent ? [{ name: '📁 الكاتيجوري', value: c.parent.name, inline: true }] : []), ...ex(en),
-        ...(mine || c.name?.startsWith('ticket-') ? [] : [{ name: '♻️ الاستعادة', value: 'متاحة من لوحة التحكم ← سلة الاستعادة' }])],
+      fields: [{ name: '📂 النوع', value: CT[c.type] || String(c.type), inline: true }, ...(c.parent ? [{ name: '📁 الكاتيجوري', value: c.parent.name, inline: true }] : []),
+        ...(c.name?.startsWith('ticket-') ? [] : [{ name: '♻️ الاستعادة', value: 'متاحة من لوحة التحكم ← سلة الاستعادة' }])],
       id: c.id
     });
   }
@@ -197,14 +193,8 @@ const chUpdate = {
     if (o.rateLimitPerUser !== n.rateLimitPerUser) f.push({ name: '🐌 الوضع البطيء', value: `${o.rateLimitPerUser \vert{}\vert{} 0}ث ← ${n.rateLimitPerUser || 0}ث`, inline: true });
     if (o.parentId !== n.parentId) f.push({ name: '📁 الكاتيجوري', value: `${o.parent?.name \vert{}\vert{} '—'} ← ${n.parent?.name || '—'}`, inline: true });
     if (o.userLimit !== n.userLimit) f.push({ name: '👥 حد الأعضاء', value: `${o.userLimit \vert{}\vert{} '∞'} ←${n.userLimit || '∞'}`, inline: true });
-    const oc = o.permissionOverwrites?.cache, nc = n.permissionOverwrites?.cache;
-    if (oc && nc) {
-      const changed = [...new Set([...oc.keys(), ...nc.keys()])].filter(id => { const a = oc.get(id), b = nc.get(id); return !a || !b || a.allow.bitfield !== b.allow.bitfield || a.deny.bitfield !== b.deny.bitfield; });
-      if (changed.length) f.push({ name: '🔐 تغيّرت صلاحيات', value: changed.map(id => ((nc.get(id) || oc.get(id)).type === 0 ? `<@&${id}>` : `<@${id}>`)).join(' ').slice(0, 1000) });
-    }
     if (!f.length) return;
-    const en = await L.who(n.guild, A.ChannelUpdate, n.id);
-    L.send(n.guild, 'channelUpdate', { desc: `${n}${chName(n)}`, fields: [...f, ...ex(en)], id: n.id });
+    L.send(n.guild, 'channelUpdate', { desc: `${n}${chName(n)}`, fields: f, id: n.id });
   }
 };
 
@@ -213,8 +203,7 @@ const roleCreate = {
   name: Events.GuildRoleCreate,
   async execute(r) {
     if (!on(r.guild, 'roleCreate')) return;
-    const en = await L.who(r.guild, A.RoleCreate, r.id);
-    L.send(r.guild, 'roleCreate', { desc: `${r} **${r.name}**`, fields: [{ name: '🎨 اللون', value: swatch(r.color), inline: true }, { name: '📌 معروضة منفصلة', value: r.hoist ? 'نعم' : 'لا', inline: true }, ...ex(en)], id: r.id });
+    L.send(r.guild, 'roleCreate', { desc: `${r} **${r.name}**`, fields: [{ name: '🎨 اللون', value: swatch(r.color), inline: true }, { name: '📌 معروضة منفصلة', value: r.hoist ? 'نعم' : 'لا', inline: true }], id: r.id });
   }
 };
 
@@ -222,17 +211,14 @@ const roleDelete = {
   name: Events.GuildRoleDelete,
   async execute(r) {
     if (!on(r.guild, 'roleDelete')) return;
-    const en = await L.who(r.guild, A.RoleDelete, r.id);
-    const mine = en?.executor?.id === r.client.user.id;
     const perms = L.permNames(r.permissions.bitfield);
     L.send(r.guild, 'roleDelete', {
       desc: `${r.unicodeEmoji || '🎭'} **${r.name}**`,
       fields: [
         { name: '🎨 اللون', value: swatch(r.color), inline: true },
         { name: '🔑 الصلاحيات', value: perms.length ? `${perms.length}` : 'لا شيء', inline: true },
-        ...ex(en),
         ...(perms.length ? [{ name: '📋 أهم الصلاحيات', value: perms.slice(0, 8).join(' • ') }] : []),
-        ...(mine || r.managed ? [] : [{ name: '♻️ الاستعادة', value: 'تقدر ترجعها مع أعضائها من لوحة التحكم ← سلة الاستعادة' }])
+        ...(r.managed ? [] : [{ name: '♻️ الاستعادة', value: 'تقدر ترجعها مع أعضائها من لوحة التحكم ← سلة الاستعادة' }])
       ],
       id: r.id
     });
@@ -253,8 +239,7 @@ const roleUpdate = {
     if (add.length) f.push({ name: '➕ صلاحيات أُضيفت', value: add.join(' • ').slice(0, 1000) });
     if (rem.length) f.push({ name: '➖ صلاحيات أُزيلت', value: rem.join(' • ').slice(0, 1000) });
     if (!f.length) return;
-    const en = await L.who(n.guild, A.RoleUpdate, n.id);
-    L.send(n.guild, 'roleUpdate', { desc: `${n} **${n.name}**`, fields: [...f, ...ex(en)], id: n.id });
+    L.send(n.guild, 'roleUpdate', { desc: `${n} **${n.name}**`, fields: f, id: n.id });
   }
 };
 
@@ -282,8 +267,7 @@ const guildUpdate = {
     if (o.verificationLevel !== n.verificationLevel) f.push({ name: '🔒 مستوى التحقق', value: `${o.verificationLevel} ← ${n.verificationLevel}`, inline: true });
     if (o.ownerId !== n.ownerId) f.push({ name: '👑 المالك', value: `<@${o.ownerId}> ← <@${n.ownerId}>` });
     if (!f.length) return;
-    const en = await L.who(n, A.GuildUpdate, n.id);
-    L.send(n, 'guildUpdate', { thumb: n.iconURL({ size: 256 }), desc: `تم تعديل إعدادات **${n.name}**`, fields: [...f, ...ex(en)], id: n.id });
+    L.send(n, 'guildUpdate', { thumb: n.iconURL({ size: 256 }), desc: `تم تعديل إعدادات **${n.name}**`, fields: f, id: n.id });
   }
 };
 
