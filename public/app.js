@@ -79,7 +79,7 @@ async function route() {
 
 function passwordScreen() {
   const passwordInput = h('input', { type: 'password', placeholder: 'أدخل كلمة المرور الحصرية...', style: 'padding:12px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:#fff;font-size:1rem;width:100%;margin-bottom:16px;' });
-  const submitBtn = h('button', { class: 'btn primary', style: 'width:100%;padding:12px;font-size:1rem;' }, '🔒 دَفْع / دخول');
+  const submitBtn = h('button', { class: 'btn primary', style: 'width:100%;padding:12px;font-size:1rem;' }, '🔒 دخول');
 
   const doLogin = async () => {
     submitBtn.disabled = true;
@@ -129,7 +129,7 @@ function picker() {
     h('h2', { style: 'margin-bottom:16px' }, 'اختر السيرفر'),
     ME?.guilds?.length ? h('div', { class: 'grid' }, ME.guilds.map(g => h('div', { class: 'gcard' },
       iconEl(g), h('b', {}, g.name),
-      g.botIn ? h('a', { class: 'btn primary sm', href: `#/g/${g.id}/overview` }, '⚙️ إدارة')
+      g.botIn ? h('a', { class: 'btn primary sm', href: `#/g/${g.id}/overview` }, '⚙️️ إدارة')
         : h('a', { class: 'btn sm', href: g.inviteUrl, target: '_blank', rel: 'noopener' }, '➕ إضافة البوت')
     ))) : h('div', { class: 'card' }, 'ما لقيت سيرفرات تملك فيها صلاحية «إدارة السيرفر».')
   ));
@@ -160,8 +160,8 @@ function renderSide() {
   SIDE.replaceChildren(
     h('div', { class: 'brand' }, h('img', { src: '/logo.png', alt: '' }), h('b', {}, 'Systemix')),
     h('a', { class: 'gsw', href: '#/' }, iconEl({ ...META.guild, name: META.guild.name }), h('div', {}, h('b', {}, META.guild.name), h('small', {}, 'تغيير السيرفر ↩'))),
-    NAV.map(sec => h('div', { class: 'grp' }, h('h6', {}, sec.g),
-      sec.items.map(k => h('a', { class: 'nav' + (k === CUR ? ' act' : ''), href: `#/g/${GID}/${k}` },
+    ...NAV.map(sec => h('div', { class: 'grp' }, h('h6', {}, sec.g),
+      ...sec.items.map(k => h('a', { class: 'nav' + (k === CUR ? ' act' : ''), href: `#/g/${GID}/${k}` },
         h('span', { class: 'ic' }, MODULES[k].icon), MODULES[k].title, META.enabled[k] ? h('span', { class: 'ck' }, '✓') : null)))),
     h('div', { class: 'foot' }, h('a', { class: 'btn sm', href: '/auth/logout' }, 'تسجيل الخروج'))
   );
