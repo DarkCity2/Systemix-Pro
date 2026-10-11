@@ -1,48 +1,42 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
 const { checkSub } = require('./subscription');
 
-const ticketModule = {
-  // التعامل مع ضغط الأزرار والنماذج
-  async handleInteraction(interaction) {
-    if (!interaction.isButton() && !interaction.isModalSubmit()) return;
+// أسماء القواعد وألوانها
+const baseNames = {
+  silver: 'Silver Base',
+  gold: 'Gold Base',
+  crystal: 'Crystal Base',
+  bloodmoon: 'BloodMoon Base',
+  rainbow: 'Rainbow Base GoUp',
+  candy: 'Candy Base GoUp',
+  cyber: 'Cyber Base GoUp',
+  party: 'Party Base GoUp',
+  bw: 'Black & White Base GoUp',
+  aqua: 'Aqua Base GoUp',
+  lava: 'Lava Base GoUp',
+  football: 'Football Base GoUp',
+  summer: 'Summer Base GoUp',
+  dreamy: 'Dreamy Base GoUp',
+  galaxy: 'Galaxy Base',
+  radioactive: 'Radioactive Base',
+  halloween: 'Halloween Base'
+};
 
-    // فحص هل اشتراك السيرفر شغال
+const ticketModule = {
+  async handleInteraction(interaction) {
+    if (!interaction.isButton()) return;
+
+    // فحص اشتراك السيرفر
     if (!checkSub(interaction.guildId).valid) return;
 
-    // عند الضغط على زر فتح تذكرة
-    if (interaction.customId === 'open_ticket_modal') {
-      const modal = new ModalBuilder()
-        .setCustomId('ticket_submit')
-        .setTitle('نموذج فتح تذكرة');
+    // إذا ضغط المستخدم على زر تذكرة لون (يبدأ بـ ticket_)
+    if (interaction.customId.startsWith('ticket_')) {
+      const baseKey = interaction.customId.replace('ticket_', '');
+      const baseName = baseNames[baseKey] || 'Custom Base';
 
-      const subjectInput = new TextInputBuilder()
-        .setCustomId('ticket_subject')
-        .setLabel('سبب التذكرة / الموضوع')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
-
-      const descInput = new TextInputBuilder()
-        .setCustomId('ticket_desc')
-        .setLabel('تفاصيل المشكلة أو الطلب')
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(subjectInput),
-        new ActionRowBuilder().addComponents(descInput)
-      );
-
-      await interaction.showModal(modal);
-    }
-
-    // عند تعبئة النموذج وإرساله
-    if (interaction.isModalSubmit() && interaction.customId === 'ticket_submit') {
-      const subject = interaction.fields.getTextInputValue('ticket_subject');
-      const desc = interaction.fields.getTextInputValue('ticket_desc');
-
-      // إنشاء روم التذكرة
+      // إنشاء روم خاصة بالتذكرة للعضو
       const ch = await interaction.guild.channels.create({
-        name: `ticket-${interaction.user.username}`,
+        name: `ticket-${baseKey}-${interaction.user.username}`.toLowerCase(),
         type: ChannelType.GuildText,
         permissionOverwrites: [
           { id: interaction.guild.id, deny: ['ViewChannel'] },
@@ -51,12 +45,8 @@ const ticketModule = {
       });
 
       const embed = new EmbedBuilder()
-        .setTitle(`مرحباً بك ${interaction.user.username}`)
-        .addFields(
-          { name: '📌 الموضوع', value: subject },
-          { name: '📝 التفاصيل', value: desc }
-        )
-        .setColor('#57f287');
+        .setTitle(`🎫 تذكرة لون: ${baseName}`)
+        .setDescription(`مرحباً <@${interaction.user.id}>!\nلقد فتحت تذكرة للحصول على لون **${baseName}**.\nالرجاء إرسال إثباتك أو المتطلبات للإدارة هنا.`);
 
       const closeBtn = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -67,10 +57,10 @@ const ticketModule = {
       );
 
       await ch.send({ content: `<@${interaction.user.id}>`, embeds: [embed], components: [closeBtn] });
-      await interaction.reply({ content: `تم فتح تذكرتك بنجاح: ${ch}`, ephemeral: true });
+      return interaction.reply({ content: `تم إنشاء تذكرتك بنجاح: ${ch}`, ephemeral: true });
     }
 
-    // عند إغلاق التذكرة
+    // زر إغلاق التذكرة
     if (interaction.customId === 'close_ticket') {
       await interaction.reply('سيتم إغلاق التذكرة خلال 5 ثوانٍ...');
       setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
