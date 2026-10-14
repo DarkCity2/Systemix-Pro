@@ -19,7 +19,6 @@ const {
 } = require('discord.js');
 const express = require('express');
 const session = require('express-session');
-const axios = require('axios');
 
 // ------------------- 1. بيانات قواعد الألوان الـ 17 -------------------
 let basesData = {
@@ -184,16 +183,20 @@ app.get('/api/auth/callback', async (req, res) => {
     params.append('code', code);
     params.append('redirect_uri', REDIRECT_URI);
 
-    const tokenResponse = await axios.post('https://discord.com/api/oauth2/token', params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0' }
+    const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
+      method: 'POST',
+      body: params,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
+    const tokenData = await tokenRes.json();
 
-    const userResponse = await axios.get('https://discord.com/api/users/@me', {
-      headers: { Authorization: `Bearer ${tokenResponse.data.access_token}`, 'User-Agent': 'Mozilla/5.0' }
+    const userRes = await fetch('https://discord.com/api/users/@me', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
     });
+    const userData = await userRes.json();
 
     req.session.authenticated = true;
-    req.session.user = userResponse.data;
+    req.session.user = userData;
     res.redirect('/');
   } catch (error) {
     res.send('<h2 style="color:red; text-align:center; font-family:sans-serif; margin-top:50px;">❌ فشل الربط مع ديسكورد.<br><a href="/login" style="color:#a78bfa;">إعادة المحاولة</a></h2>');
@@ -586,7 +589,6 @@ client.on('interactionCreate', async interaction => {
     const hasBaseRole = member.roles.cache.some(r => r.name.toLowerCase() === baseName.toLowerCase());
     const hasOwnerRole = member.roles.cache.some(r => r.name.toLowerCase() === serverSettings.ownerRoleName.toLowerCase()) || member.permissions.has(PermissionFlagsBits.Administrator);
 
-    // التحقق العام: حظر أي شخص ليس لديه صلاحية من استخدام القائمة نهائياً
     if (!hasBaseRole && !hasOwnerRole) {
       return interaction.reply({ content: '❌ **عذراً، هذه القائمة مخصصة فقط لمسؤولي التذاكر!**', ephemeral: true });
     }
@@ -679,7 +681,6 @@ client.on('interactionCreate', async interaction => {
     const closedEmbed = new EmbedBuilder()
       .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL() })
       .setTitle('Ticket Closed 🔒')
-      .setImage('https://i.ibb.co/YOUR_IMAGE_LINK_HERE.png') // استبدل الرابط برابط صورة VOID الفخمة التي أرسلتها
       .addFields(
         { name: 'Opened By', value: openedByMention, inline: true },
         { name: 'Claimed By', value: claimedByText, inline: true },
