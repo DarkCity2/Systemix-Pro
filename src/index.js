@@ -579,19 +579,16 @@ client.on('interactionCreate', async interaction => {
     }
   }
 
-  // ------------------- الصلاحيات والتحكم -------------------
+  // ------------------- الصلاحيات الدقيقة حسب اسم الرتبة فقط -------------------
   if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_action_select') {
     const action = interaction.values[0];
     const member = interaction.member;
     const ticketData = ticketsDataMap.get(interaction.channel.id) || {};
     const baseName = ticketData.baseName || '';
 
+    // التحقق بالاعتماد على أسماء الرتب فقط دون أدمن تلقائي
     const hasBaseRole = member.roles.cache.some(r => r.name.toLowerCase() === baseName.toLowerCase());
-    const hasOwnerRole = member.roles.cache.some(r => r.name.toLowerCase() === serverSettings.ownerRoleName.toLowerCase()) || member.permissions.has(PermissionFlagsBits.Administrator);
-
-    if (!hasBaseRole && !hasOwnerRole) {
-      return interaction.reply({ content: '❌ **عذراً، هذه القائمة مخصصة فقط لمسؤولي التذاكر!**', ephemeral: true });
-    }
+    const hasOwnerRole = member.roles.cache.some(r => r.name.toLowerCase() === serverSettings.ownerRoleName.toLowerCase());
 
     if (action === 'close_with_reason') {
       if (!hasBaseRole && !hasOwnerRole) {
