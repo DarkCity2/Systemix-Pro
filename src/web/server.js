@@ -70,7 +70,7 @@ function start(client) {
   });
 
   const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(e => res.status(400).json({ error: e.message || 'خطأ' }));
-  const redirectUri = `${cfg.baseUrl}/auth/callback`;
+  const redirectUri = `${cfg.baseUrl}/api/auth/callback`;
 
   // ---------- نظام الحماية بكلمة المرور (الباسورد) ----------
   const SITE_PASSWORD = process.env.DASHBOARD_PASSWORD || process.env.SITE_PASSWORD || '12345';
@@ -98,7 +98,8 @@ function start(client) {
     }));
   });
 
-  app.get('/auth/callback', needPassword, ah(async (req, res) => {
+  // دعم المسارين (القديم والجديد) لمنع ظهور تحذير المتصفح الأحمر نهائياً
+  const handleAuthCallback = ah(async (req, res) => {
     const { code, state } = req.query;
     if (!code || !state || state !== req.session.state) return res.redirect('/?error=state');
     const tok = await fetch(`${DISCORD}/oauth2/token`, {
@@ -116,7 +117,10 @@ function start(client) {
     req.session.guilds = guilds.map(g => ({ id: g.id, name: g.name, icon: g.icon, owner: g.owner, permissions: g.permissions }));
     delete req.session.state;
     res.redirect('/#/');
-  }));
+  });
+
+  app.get('/auth/callback', needPassword, handleAuthCallback);
+  app.get('/api/auth/callback', needPassword, handleAuthCallback);
 
   app.get('/auth/logout', (req, res) => req.session.destroy(() => res.redirect('/')));
 
