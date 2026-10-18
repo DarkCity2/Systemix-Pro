@@ -24,10 +24,12 @@ const baseNames = {
 };
 
 const ticketModule = {
-  // ---------- 1. دالة نشر لوحة التذاكر من الموقع (تحل مشكلة publishPanel) ----------
+  // ---------- 1. دالة نشر لوحة التذاكر من الموقع ----------
   async publishPanel(guild) {
     const ticketConfig = db.cfg(guild.id)?.tickets || {};
-    const channelId = ticketConfig.channelId;
+    
+    // البحث عن أيدي الروم بغض النظر عن اسم المفهوم في اللوحة
+    const channelId = ticketConfig.channelId || ticketConfig.panelChannelId || ticketConfig.room;
     if (!channelId) throw new Error('يرجى تحديد روم لوحة التذاكر في الإعدادات أولاً');
 
     const channel = guild.channels.cache.get(channelId);
@@ -63,7 +65,7 @@ const ticketModule = {
     // فحص اشتراك السيرفر
     if (!checkSub(interaction.guildId).valid) return;
 
-    // فتح تذكرة (سواءً عامة أو لون محدد)
+    // فتح تذكرة
     if (interaction.customId.startsWith('ticket_')) {
       const baseKey = interaction.customId.replace('ticket_', '');
       const baseName = baseNames[baseKey] || 'الدعم الفني';
@@ -76,15 +78,14 @@ const ticketModule = {
         .replace(/{username}/g, interaction.user.username)
         .replace(/{server}/g, interaction.guild.name);
 
-      // البحث عن رتبة الدعم المخصصة إن وجدت
-      const staffRoleId = ticketConfig.staffRoleId;
+      const staffRoleId = ticketConfig.staffRoleId || ticketConfig.supportRoleId;
       const staffRole = staffRoleId ? interaction.guild.roles.cache.get(staffRoleId) : null;
 
       // إنشاء قناة التذكرة
       const ch = await interaction.guild.channels.create({
         name: `ticket-${baseKey}-${interaction.user.username}`.toLowerCase(),
         type: ChannelType.GuildText,
-        parent: ticketConfig.categoryId || undefined,
+        parent: ticketConfig.categoryId || ticketConfig.category || undefined,
         permissionOverwrites: [
           { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
           { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
@@ -94,7 +95,6 @@ const ticketModule = {
 
       const openTimestamp = `<t:${Math.floor(Date.now() / 1000)}:f>`;
 
-      // إمبد فخم ومرتب مريح للعين
       const embed = new EmbedBuilder()
         .setDescription(`**مشرفي التذاكر : [ 🛡️ ]**\n${staffRole ? `<@&${staffRole.id}>` : '@LS | Management'}\n\n**تاريخ التذكرة : [ 📅 ]**\n${openTimestamp}\n\n**قسم التذكرة : [ ❓ ]**\n${ch.name} | ${baseName}\n\n**الرسالة :**\n${formattedWelcome}`)
         .setColor('#2b2d31');
