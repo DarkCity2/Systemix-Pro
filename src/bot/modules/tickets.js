@@ -3,7 +3,7 @@ const { checkSub } = require('./subscription');
 const db = require('../../db');
 
 const ticketModule = {
-  // ---------- 1. نشر لوحة التذاكر الرئيسية بالخيارين ----------
+  // ---------- 1. نشر لوحة التذاكر بلمسة فخمة وتنسيق عالي الجودة ----------
   async publishPanel(guild) {
     const ticketConfig = db.cfg(guild.id)?.tickets || {};
     
@@ -15,22 +15,31 @@ const ticketModule = {
     }
     if (!channel) throw new Error('لم يتم العثور على روم نصي مناسب لنشر اللوحة');
 
-    const title = ticketConfig.title || '✨ مركز التذاكر والخدمات الرسمية';
-    const description = ticketConfig.description || 
-      '# 🎯 أهلاً بك في نظام التذاكر\n' +
-      '> يرجى اختيار القسم المناسب لطلبك من الأزرار أدناه:\n\n' +
-      '• **الدعم الفني:** للاستفسارات والمشاكل العامة\n' +
-      '• **التقديم على الإدارة:** لطلب الانضمام لطاقم العمل';
+    const title = ticketConfig.title || ' SYSTEMIX | SUPPORT CENTER';
+    
+    // تنسيق محتوى فخم مع استخدام الرموز والمحاذاة النظيفة
+    const description = 
+      `# ─── 🛠️ مركز الخدمة والدعم الفني ───\n\n` +
+      `> **أهلاً بك في نظام التذاكر المطور المخصص لسيرفر ${guild.name}**\n` +
+      `> يسعدنا خدمتك وطاقم الإدارة متواجد دائماً لمساعدتك.\n\n` +
+      `### 📌 الأقسام المتاحة للفتح:\n` +
+      `**[ 🎫 ] الدعم الفني العام**\n` +
+      `┗ *خصص للاستفسارات، بلاغات المشاكل، والمساعدة العامة.*\n\n` +
+      `**[ 📋 ] التقديم على طاقم الإدارة**\n` +
+      `┗ *خصص للراغبين بالانضمام إلى الفريق الإداري للسيرفر.*\n\n` +
+      `─── ⚠️ **تنبيه هام** ───\n` +
+      `• *يرجى عدم فتح التذكرة لغير الحاجة.*\n` +
+      `• *تجهز بجميع تفاصيل استفسارك أو طلبك فور الفتح.*`;
 
     const embed = new EmbedBuilder()
       .setTitle(title)
       .setDescription(description)
-      .setColor('#2b2d31')
-      .setThumbnail(guild.iconURL({ dynamic: true }) || null)
-      .setFooter({ text: `Systemix Management System • ${guild.name}`, iconURL: guild.iconURL({ dynamic: true }) || undefined })
+      .setColor('#2b2d31') // اللون الفحمي المريح
+      .setThumbnail(guild.iconURL({ dynamic: true, size: 512 }) || null)
+      .setFooter({ text: `${guild.name} • VIP System`, iconURL: guild.iconURL({ dynamic: true }) || undefined })
       .setTimestamp();
 
-    // إنشاء زرين: الدعم الفني + التقديم على الإدارة
+    // أزرار تفاعلية بإيموجيات مرتبة
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('ticket_support')
@@ -48,7 +57,7 @@ const ticketModule = {
     return msg.url;
   },
 
-  // ---------- 2. معالجة التفاعل وفتح التذاكر حسب الاختيار ----------
+  // ---------- 2. فتح التذكرة بتنسيق إمبد داخلي فاخر للغاية ----------
   async handleInteraction(interaction) {
     if (!interaction.isButton()) return;
 
@@ -57,13 +66,13 @@ const ticketModule = {
     if (interaction.customId === 'ticket_support' || interaction.customId === 'ticket_apply') {
       const isApply = interaction.customId === 'ticket_apply';
       const ticketType = isApply ? 'تقديم-إدارة' : 'دعم-فني';
-      const ticketTitle = isApply ? '📋 التقديم على طاقم الإدارة' : '🎫 تذكرة الدعم الفني';
+      const ticketTitle = isApply ? '📋 قسم التقديم الإداري' : '🎫 قسم الدعم الفني';
       
       const ticketConfig = db.cfg(interaction.guild.id)?.tickets || {};
       
       const defaultMsg = isApply 
-        ? 'أهلاً بك يا بطل!\nيرجى كتابة عمرك، خبرتك، ولماذا تريد الانضمام للإدارة بالتفصيل.' 
-        : 'أهلاً بك!\nاشرح مشكلتك أو استفسارك وسيرد عليك فريق الدعم في أقرب وقت.';
+        ? 'يرجى كتابة اسمك، عمرك، خبراتك السابقة، ولماذا ترغب بالانضمام لطاقمنا.' 
+        : 'يرجى كتابة مشكلتك أو استفسارك بالتفصيل مع إرفاق أي صور أو أدلة إن وجدت.';
         
       const welcomeMsg = ticketConfig.welcomeMsg || defaultMsg;
       const formattedWelcome = welcomeMsg
@@ -86,20 +95,23 @@ const ticketModule = {
         ]
       });
 
-      const openTimestamp = `<t:${Math.floor(Date.now() / 1000)}:R>`;
+      const openTimestamp = `<t:${Math.floor(Date.now() / 1000)}:F>`;
 
+      // إمبد داخلي ينطق فخامة
       const ticketEmbed = new EmbedBuilder()
-        .setAuthor({ name: `${ticketTitle} | ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
-        .setColor(isApply ? '#2ecc71' : '#3498db')
+        .setAuthor({ name: `${interaction.user.tag} • Systemix Tickets`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+        .setColor(isApply ? '#2ecc71' : '#5865F2')
         .setDescription(
-          `# 👑 مرحباً بك في تذكرتك\n\n` +
-          `> ${formattedWelcome}\n\n` +
-          `• **صاحب الطلب:** ${interaction.user.username}\n` +
-          `• **نوع التذكرة:** ${ticketTitle}\n` +
-          `• **وقت الفتح:** ${openTimestamp}\n\n` +
-          `**🛡️ الفريق المسؤول:** ${staffRole ? `<@&${staffRole.id}>` : '`طاقم الإدارة`'}`
+          `# ─── ${ticketTitle} ───\n\n` +
+          `> **أهلاً بك <@${interaction.user.id}> في تذكرتك الخاصة!**\n\n` +
+          `### 📝 المطلوب منك:\n` +
+          `*${formattedWelcome}*\n\n` +
+          `─── 📊 **معلومات التذكرة** ───\n` +
+          `• **صاحب التذكرة:** <@${interaction.user.id}>\n` +
+          `• **تاريخ الفتح:** ${openTimestamp}\n` +
+          `• **المسؤولين:** ${staffRole ? `<@&${staffRole.id}>` : '`طاقم الإدارة`'}\n`
         )
-        .setFooter({ text: `Systemix Ticket System • ${interaction.guild.name}`, iconURL: interaction.guild.iconURL() || undefined })
+        .setFooter({ text: `${interaction.guild.name} • Ticket System`, iconURL: interaction.guild.iconURL() || undefined })
         .setTimestamp();
 
       const closeBtn = new ActionRowBuilder().addComponents(
@@ -126,7 +138,7 @@ const ticketModule = {
     if (interaction.customId === 'close_ticket') {
       const confirmEmbed = new EmbedBuilder()
         .setTitle('🔒 إغلاق التذكرة')
-        .setDescription('`سيتم حذف التذكرة خلال 5 ثوانٍ تلقائياً...`')
+        .setDescription('`جاري أرشفة وحذف القناة خلال 5 ثوانٍ...`')
         .setColor('#ed4245');
 
       await interaction.reply({ embeds: [confirmEmbed] });
