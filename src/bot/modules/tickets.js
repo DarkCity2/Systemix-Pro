@@ -11,7 +11,7 @@ const { checkSub } = require('./subscription');
 const db = require('../../db');
 
 const ticketModule = {
-  // ---------- 1. نشر لوحة التذاكر (صورة عريضة ثابتة ومضمونة + كلام مرتب) ----------
+  // ---------- 1. نشر لوحة التذاكر (صورة عريضة + كلام محاذاة ونظيف) ----------
   async publishPanel(guild) {
     const ticketConfig = db.cfg(guild.id)?.tickets || {};
     
@@ -23,14 +23,14 @@ const ticketModule = {
     }
     if (!channel) throw new Error('لم يتم العثور على روم نصي مناسب لنشر اللوحة');
 
-    // رابط بانر عريضي واحترافي يضمن ظهور الصورة بشكل جميل وكامل
-    const bannerUrl = ticketConfig.bannerUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop';
+    // رابط البانر العريض
+    const bannerUrl = ticketConfig.bannerUrl || guild.bannerURL({ size: 1024, extension: 'png' }) || 'https://i.imgur.com/8Q9Z4yX.png';
 
     const embed = new EmbedBuilder()
       .setColor('#2b2d31')
-      .setTitle(`✨ مركز التذاكر والخدمات الرسمية`)
+      .setTitle(`✨ مركز التذاكر والخدمات الرسمية | ${guild.name}`)
       .setDescription(`> قم باختيار القسم المناسب لطلبك من القائمة أدناه ليتم فتح تذكرة خاصة بك فوراً.`)
-      .setImage(bannerUrl); // تعيين الصورة العريضة لتملأ العرض كاملاً
+      .setImage(bannerUrl);
 
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId('ticket_select_menu')
@@ -54,16 +54,21 @@ const ticketModule = {
     return msg.url;
   },
 
-  // ---------- 2. معالجة تفاعلات القائمة والتذاكر بدون أي أخطاء مهلة ----------
+  // ---------- 2. معالجة فتح وإغلاق التذاكر مع استجابة فورية ----------
   async handleInteraction(interaction) {
-    if (!checkSub(interaction.guildId).valid) return;
+    // التأكد من أن التفاعل موجه للتذاكر
+    if (!interaction.customId || (!interaction.customId.startsWith('ticket_') && interaction.customId !== 'close_ticket')) return;
 
-    // التعامل مع القائمة المنسدلة
+    // استجابة فورية جدارية لمنع خطأ انتهاء المهلة (Didn't respond in time)
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.deferReply({ ephemeral: true }).catch(() => {});
+    }
+
+    if (!checkSub(interaction.guildId).valid) {
+      return interaction.editReply({ content: '❌ الاشتراك غير مفعل لهذا السيرفر.' }).catch(() => {});
+    }
+
     if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_select_menu') {
-      try {
-        await interaction.deferReply({ ephemeral: true });
-      } catch (e) {}
-
       const selectedValue = interaction.values[0];
       const isApply = selectedValue === 'ticket_apply';
       
@@ -74,57 +79,59 @@ const ticketModule = {
       const staffRoleId = ticketConfig.staffRoleId || ticketConfig.supportRoleId;
       const staffRole = staffRoleId ? interaction.guild.roles.cache.get(staffRoleId) : null;
 
-      // إنشاء قناة التذكرة
-      const ch = await interaction.guild.channels.create({
-        name: `${ticketType}-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, ''),
-        type: ChannelType.GuildText,
-        parent: ticketConfig.categoryId || ticketConfig.category || undefined,
-        permissionOverwrites: [
-          { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-          { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks] },
-          ...(staffRole ? [{ id: staffRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks] }] : [])
-        ]
-      });
+      try {
+        const ch = await interaction.guild.channels.create({
+          name: `${ticketType}-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, ''),
+          type: ChannelType.GuildText,
+          parent: ticketConfig.categoryId || ticketConfig.category || undefined,
+          permissionOverwrites: [
+            { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+            { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks] },
+            ...(staffRole ? [{ id: staffRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks] }] : [])
+          ]
+        });
 
-      const openTimestamp = `<t:${Math.floor(Date.now() / 1000)}:R>`;
+        const openTimestamp = `<t:${Math.floor(Date.now() / 1000)}:R>`;
 
-      const ticketEmbed = new EmbedBuilder()
-        .setColor('#2b2d31')
-        .setDescription(
-          `### ${ticketTitle}\n` +
-          `> أهلاً بك <@${interaction.user.id}>، يرجى كتابة تفاصيل طلبك هنا وسيرد عليك الإداري المختص قريباً.\n\n` +
-          `• **الوقت:** ${openTimestamp}\n` +
-          `• **المسؤول:** ${staffRole ? `<@&${staffRole.id}>` : '`طاقم الإدارة`'}`
-        )
-        .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() || undefined });
+        const ticketEmbed = new EmbedBuilder()
+          .setColor('#2b2d31')
+          .setDescription(
+            `### ${ticketTitle}\n` +
+            `> أهلاً بك <@${interaction.user.id}>، يرجى كتابة تفاصيل طلبك هنا وسيرد عليك الإداري المختص قريباً.\n\n` +
+            `• **الوقت:** ${openTimestamp}\n` +
+            `• **المسؤول:** ${staffRole ? `<@&${staffRole.id}>` : '`طاقم الإدارة`'}`
+          )
+          .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() || undefined });
 
-      const closeBtn = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('close_ticket')
-          .setLabel('إغلاق التذكرة')
-          .setEmoji('🔒')
-          .setStyle(ButtonStyle.Danger)
-      );
+        const closeBtn = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('close_ticket')
+            .setLabel('إغلاق التذكرة')
+            .setEmoji('🔒')
+            .setStyle(ButtonStyle.Danger)
+        );
 
-      await ch.send({
-        content: `|| <@${interaction.user.id}> ${staffRole ? `<@&${staffRole.id}>` : ''} ||`,
-        embeds: [ticketEmbed],
-        components: [closeBtn]
-      });
+        await ch.send({
+          content: `|| <@${interaction.user.id}> ${staffRole ? `<@&${staffRole.id}>` : ''} ||`,
+          embeds: [ticketEmbed],
+          components: [closeBtn]
+        });
 
-      return interaction.editReply({ 
-        content: `✨ **تم فتح تذكرتك بنجاح:** ${ch}` 
-      }).catch(() => {});
+        return interaction.editReply({ 
+          content: `✨ **تم فتح تذكرتك بنجاح:** ${ch}` 
+        }).catch(() => {});
+
+      } catch (err) {
+        console.error('Ticket Creation Error:', err);
+        return interaction.editReply({ content: '❌ حدث خطأ أثناء إنشاء التذكرة، يرجى التأكد من صلاحيات البوت.' }).catch(() => {});
+      }
     }
 
-    // التعامل مع زر إغلاق التذكرة
+    // زر إغلاق التذكرة
     if (interaction.isButton() && interaction.customId === 'close_ticket') {
-      try {
-        await interaction.reply({ 
-          embeds: [new EmbedBuilder().setDescription('🔒 **سيتم حذف التذكرة خلال 5 ثوانٍ...**').setColor('#ed4245')],
-          ephemeral: true 
-        });
-      } catch (e) {}
+      await interaction.editReply({ 
+        embeds: [new EmbedBuilder().setDescription('🔒 **سيتم حذف التذكرة خلال 5 ثوانٍ...**').setColor('#ed4245')]
+      }).catch(() => {});
 
       setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
     }
