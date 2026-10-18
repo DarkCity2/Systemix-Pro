@@ -11,7 +11,7 @@ const { checkSub } = require('./subscription');
 const db = require('../../db');
 
 const ticketModule = {
-  // ---------- 1. نشر لوحة التذاكر (صورة + قائمة منسدلة خفيفة) ----------
+  // ---------- 1. نشر لوحة التذاكر (بانر + قائمة منسدلة بدون شرح فرعي) ----------
   async publishPanel(guild) {
     const ticketConfig = db.cfg(guild.id)?.tickets || {};
     
@@ -23,25 +23,29 @@ const ticketModule = {
     }
     if (!channel) throw new Error('لم يتم العثور على روم نصي مناسب لنشر اللوحة');
 
-    // إمبد خفيف ونظيف يحتوي على بانر فقط بدلاً من النصوص الطويلة
-    const embed = new EmbedBuilder()
-      .setColor('#2b2d31')
-      .setImage(ticketConfig.bannerUrl || 'https://images-ext-1.discordapp.net/external/v_03p_1L8tHqA_M28Y_l8G0Q7Z9p/https/i.imgur.com/8Q9Z4yX.png'); // رابط البانر الخاص بك
+    const bannerUrl = ticketConfig.bannerUrl || guild.bannerURL({ size: 1024, extension: 'png' }) || guild.iconURL({ size: 512, extension: 'png' });
 
-    // إنشاء القائمة المنسدلة (Select Menu)
+    const embed = new EmbedBuilder()
+      .setColor('#2b2d31');
+
+    if (bannerUrl) {
+      embed.setImage(bannerUrl);
+    } else {
+      embed.setDescription(`**مركز التذاكر والخدمات الرسمية | ${guild.name}**`);
+    }
+
+    // القائمة المنسدلة بدون الشرح الفرعي
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId('ticket_select_menu')
       .setPlaceholder('اختر خيار التذكرة...')
       .addOptions([
         {
-          label: 'Technical Support | الدعم الفني',
-          description: 'للاستفسارات والمشاكل العامة',
+          label: 'الدعم الفني | Technical Support',
           value: 'ticket_support',
           emoji: '🎫'
         },
         {
-          label: 'Management Application | التقديم على الإدارة',
-          description: 'طلب الانضمام لطاقم العمل',
+          label: 'التقديم على الإدارة | Management Application',
           value: 'ticket_apply',
           emoji: '📋'
         }
@@ -53,11 +57,10 @@ const ticketModule = {
     return msg.url;
   },
 
-  // ---------- 2. معالجة التفاعل وتنسيق التذكرة المفتوحة ----------
+  // ---------- 2. معالجة فتح وإغلاق التذاكر ----------
   async handleInteraction(interaction) {
     if (!checkSub(interaction.guildId).valid) return;
 
-    // عند اختيار خيار من القائمة المنسدلة
     if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_select_menu') {
       const selectedValue = interaction.values[0];
       const isApply = selectedValue === 'ticket_apply';
@@ -69,7 +72,6 @@ const ticketModule = {
       const staffRoleId = ticketConfig.staffRoleId || ticketConfig.supportRoleId;
       const staffRole = staffRoleId ? interaction.guild.roles.cache.get(staffRoleId) : null;
 
-      // إنشاء القناة
       const ch = await interaction.guild.channels.create({
         name: `${ticketType}-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, ''),
         type: ChannelType.GuildText,
@@ -83,7 +85,6 @@ const ticketModule = {
 
       const openTimestamp = `<t:${Math.floor(Date.now() / 1000)}:R>`;
 
-      // رسالة داخلية خفيفة جداً ومريحة للعين بدون حشو
       const ticketEmbed = new EmbedBuilder()
         .setColor('#2b2d31')
         .setDescription(
@@ -108,14 +109,12 @@ const ticketModule = {
         components: [closeBtn]
       });
 
-      // إعادة تصفير القائمة المنسدلة في اللوحة
-      await interaction.reply({ 
+      return interaction.reply({ 
         content: `✨ **تم فتح تذكرتك بنجاح:** ${ch}`, 
         ephemeral: true 
       });
     }
 
-    // زر إغلاق التذكرة
     if (interaction.isButton() && interaction.customId === 'close_ticket') {
       const confirmEmbed = new EmbedBuilder()
         .setDescription('🔒 **سيتم حذف التذكرة خلال 5 ثوانٍ...**')
