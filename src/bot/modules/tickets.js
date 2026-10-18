@@ -11,7 +11,7 @@ const { checkSub } = require('./subscription');
 const db = require('../../db');
 
 const ticketModule = {
-  // ---------- 1. نشر لوحة التذاكر (بانر + قائمة منسدلة بدون شرح فرعي) ----------
+  // ---------- 1. نشر لوحة التذاكر (صورة عريضة + نص خفيف مرتب) ----------
   async publishPanel(guild) {
     const ticketConfig = db.cfg(guild.id)?.tickets || {};
     
@@ -23,18 +23,22 @@ const ticketModule = {
     }
     if (!channel) throw new Error('لم يتم العثور على روم نصي مناسب لنشر اللوحة');
 
-    const bannerUrl = ticketConfig.bannerUrl || guild.bannerURL({ size: 1024, extension: 'png' }) || guild.iconURL({ size: 512, extension: 'png' });
+    // جلب الصورة العريضة (البانر) تلقائياً من السيرفر أو الرابط في الإعدادات
+    const bannerUrl = ticketConfig.bannerUrl || guild.bannerURL({ size: 1024, extension: 'png' }) || guild.iconURL({ size: 1024, extension: 'png' });
 
+    // إمبد سينمائي خفيف ومريح للعين
     const embed = new EmbedBuilder()
-      .setColor('#2b2d31');
+      .setColor('#2b2d31')
+      .setDescription(
+        `### ✨ مركز التذاكر والدعم الفني | ${guild.name}\n` +
+        `> اختر الخيار المناسب لطلبك من القائمة المنسدلة أدناه.`
+      );
 
     if (bannerUrl) {
-      embed.setImage(bannerUrl);
-    } else {
-      embed.setDescription(`**مركز التذاكر والخدمات الرسمية | ${guild.name}**`);
+      embed.setImage(bannerUrl); // يجعل الصورة عريضة وتملأ العرض كاملاً
     }
 
-    // القائمة المنسدلة بدون الشرح الفرعي
+    // القائمة المنسدلة النظيفة بدون حشو
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId('ticket_select_menu')
       .setPlaceholder('اختر خيار التذكرة...')
