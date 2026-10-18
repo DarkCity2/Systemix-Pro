@@ -19,10 +19,8 @@ const ticketModule = {
     const description = ticketConfig.description || 
       '# 🎯 أهلاً بك في نظام التذاكر\n' +
       '> يرجى اختيار القسم المناسب لطلبك من الأزرار أدناه:\n\n' +
-      '```yaml\n' +
-      '• الدعم الفني: للاستفسارات والمشاكل العامة\n' +
-      '• التقديم على الإدارة: لطلب الانضمام لطاقم العمل\n' +
-      '```';
+      '• **الدعم الفني:** للاستفسارات والمشاكل العامة\n' +
+      '• **التقديم على الإدارة:** لطلب الانضمام لطاقم العمل';
 
     const embed = new EmbedBuilder()
       .setTitle(title)
@@ -63,7 +61,6 @@ const ticketModule = {
       
       const ticketConfig = db.cfg(interaction.guild.id)?.tickets || {};
       
-      // رسالة الترحيب داخل التذكرة بناءً على النوع
       const defaultMsg = isApply 
         ? 'أهلاً بك يا بطل!\nيرجى كتابة عمرك، خبرتك، ولماذا تريد الانضمام للإدارة بالتفصيل.' 
         : 'أهلاً بك!\nاشرح مشكلتك أو استفسارك وسيرد عليك فريق الدعم في أقرب وقت.';
@@ -97,11 +94,9 @@ const ticketModule = {
         .setDescription(
           `# 👑 مرحباً بك في تذكرتك\n\n` +
           `> ${formattedWelcome}\n\n` +
-          ````yaml\n` +
-          `• صاحب الطلب: ${interaction.user.username}\n` +
-          `• نوع التذكرة: ${ticketTitle}\n` +
-          `• وقت الفتح: ${openTimestamp}\n` +
-          ````\n` +
+          `• **صاحب الطلب:** ${interaction.user.username}\n` +
+          `• **نوع التذكرة:** ${ticketTitle}\n` +
+          `• **وقت الفتح:** ${openTimestamp}\n\n` +
           `**🛡️ الفريق المسؤول:** ${staffRole ? `<@&${staffRole.id}>` : '`طاقم الإدارة`'}`
         )
         .setFooter({ text: `Systemix Ticket System • ${interaction.guild.name}`, iconURL: interaction.guild.iconURL() || undefined })
