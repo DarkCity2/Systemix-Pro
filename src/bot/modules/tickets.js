@@ -11,7 +11,7 @@ const { checkSub } = require('./subscription');
 const db = require('../../db');
 
 const ticketModule = {
-  // ---------- 1. نشر لوحة التذاكر (تصميم سينمائي فخم وعريض) ----------
+  // ---------- 1. نشر لوحة التذاكر (صورة عريضة + كلام مرتب) ----------
   async publishPanel(guild) {
     const ticketConfig = db.cfg(guild.id)?.tickets || {};
     
@@ -23,23 +23,20 @@ const ticketModule = {
     }
     if (!channel) throw new Error('لم يتم العثور على روم نصي مناسب لنشر اللوحة');
 
-    // جلب البانر العريضي الحقيقي للسيرفر (Wide Banner) حصرياً
+    // جلب البانر العريضي الحقيقي للسيرفر أو الرابط الاحتياطي
     const wideBanner = guild.bannerURL({ size: 1024, extension: 'png' });
     const fallbackBanner = ticketConfig.bannerUrl || null;
     const finalBanner = wideBanner || fallbackBanner;
 
-    // إمبد راقي ونظيف جداً
     const embed = new EmbedBuilder()
       .setColor('#2b2d31')
       .setTitle(`✨ مركز التذاكر والخدمات الرسمية`)
       .setDescription(`> قم باختيار القسم المناسب لطلبك من القائمة أدناه ليتم فتح تذكرة خاصة بك فوراً.`);
 
-    // إذا وُجد بانر عريضي للسيرفر يتم إضافته بشكل احترافي
     if (finalBanner) {
       embed.setImage(finalBanner);
     }
 
-    // القائمة المنسدلة النظيفة والمرتبة
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId('ticket_select_menu')
       .setPlaceholder('اختر خيار التذكرة...')
@@ -62,13 +59,16 @@ const ticketModule = {
     return msg.url;
   },
 
-  // ---------- 2. معالجة فتح وإغلاق التذاكر بسرعة فائقة ----------
+  // ---------- 2. معالجة تفاعلات القائمة والتذاكر بدون أخطاء ----------
   async handleInteraction(interaction) {
     if (!checkSub(interaction.guildId).valid) return;
 
+    // التعامل مع القائمة المنسدلة
     if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_select_menu') {
-      // الرد السريع لمنع خطأ انتهاء المهلة
-      await interaction.deferReply({ ephemeral: true });
+      // إيقاف خطأ المهلة من ديسكورد فوراً
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true }).catch(() => {});
+      }
 
       const selectedValue = interaction.values[0];
       const isApply = selectedValue === 'ticket_apply';
@@ -80,6 +80,7 @@ const ticketModule = {
       const staffRoleId = ticketConfig.staffRoleId || ticketConfig.supportRoleId;
       const staffRole = staffRoleId ? interaction.guild.roles.cache.get(staffRoleId) : null;
 
+      // إنشاء قناة التذكرة
       const ch = await interaction.guild.channels.create({
         name: `${ticketType}-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, ''),
         type: ChannelType.GuildText,
@@ -119,14 +120,19 @@ const ticketModule = {
 
       return interaction.editReply({ 
         content: `✨ **تم فتح تذكرتك بنجاح:** ${ch}` 
-      });
+      }).catch(() => {});
     }
 
+    // التعامل مع زر إغلاق التذكرة
     if (interaction.isButton() && interaction.customId === 'close_ticket') {
-      await interaction.reply({ 
-        embeds: [new EmbedBuilder().setDescription('🔒 **سيتم حذف التذكرة خلال 5 ثوانٍ...**').setColor('#ed4245')],
-        ephemeral: true 
-      });
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true }).catch(() => {});
+      }
+
+      await interaction.editReply({ 
+        embeds: [new EmbedBuilder().setDescription('🔒 **سيتم حذف التذكرة خلال 5 ثوانٍ...**').setColor('#ed4245')]
+      }).catch(() => {});
+
       setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
     }
   }
